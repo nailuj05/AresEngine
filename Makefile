@@ -32,7 +32,7 @@ $(RUNTIME): $(RUNTIME_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) | $(BUILD)
 # editor -- engine + raygui
 editor: $(EDITOR)
 $(EDITOR): $(EDITOR_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) $(RAYGUI_OBJ) | $(BUILD)
-	$(DC) $(DFLAGS) -of=$@ $^ $(LFLAGS)
+	$(DC) $(DFLAGS) -version=Editor -of=$@ $^ $(LFLAGS)
 
 $(BUILD):
 	mkdir -p $(BUILD)

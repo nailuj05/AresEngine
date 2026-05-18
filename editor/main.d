@@ -3,10 +3,12 @@ module main;
 import raylib;
 import raygui;
 import engine.core.window;
+import engine.core.component;
 import engine.scene.scene;
 import engine.scene.gameobject;
 import engine.renderer.meshrenderer;
 import editor.style;
+import editor.inspector.inspector;
 
 private Scene           activeScene;
 private GameObject      selected;
@@ -14,7 +16,6 @@ private RenderTexture2D sceneTarget;
 private Camera3D        editorCam;
 
 enum HIERARCHY_W = 220;
-enum INSPECTOR_W = 280;
 
 int vpX() { return HIERARCHY_W; }
 int vpW() { return GetScreenWidth()  - HIERARCHY_W - INSPECTOR_W; }
@@ -62,7 +63,7 @@ void main() {
       ClearBackground(Colors.PINK);
       drawHierarchy();
       drawViewport();
-      drawInspector();
+      drawInspector(selected, GetScreenWidth() - INSPECTOR_W, GetScreenHeight());
     EndDrawing();
   }
 }
@@ -100,13 +101,3 @@ void drawViewport() {
   DrawTexturePro(sceneTarget.texture, src, dest, Vector2(0, 0), 0.0f, Colors.WHITE);
 }
 
-void drawInspector() {
-  immutable int x = GetScreenWidth() - INSPECTOR_W;
-  immutable int h = GetScreenHeight();
-  DrawRectangle(x, 0, INSPECTOR_W, h, GetColor(PANEL_BG));
-  GuiPanel(Rectangle(x, 0, INSPECTOR_W, h), "Inspector");
-
-  if (selected is null) return;
-  GuiLabel(Rectangle(x + 4, 32, INSPECTOR_W - 8, 20), selected.name.ptr);
-  // TODO: per-component field rendering
-}

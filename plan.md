@@ -3,7 +3,7 @@
 ## Overview
 
 A simple, self-contained 2D/3D game engine written in **D**, using **Raylib** for rendering/input
-and **Clay** for UI layout.
+and **RayGUI** for UI layout.
 
 ---
 
@@ -13,25 +13,10 @@ and **Clay** for UI layout.
 |-------------|-------------------------------------------------|
 | Language    | D                                               |
 | Rendering   | Raylib                                          |
-| UI Layout   | Clay (C single-header library)                  |
+| UI Layout   | RayGUI                                          |
 | Scripting   | Lua                                             |
 | Scene data  | JSON (human-readable, good enough for own use)  |
 
-### Clay Bindings
-
-Clay ships as a single-header C library. Integration approach:
-
-```c
-// clay_impl.c -- compiled once, linked into the engine
-#define CLAY_IMPLEMENTATION
-#include "clay.h"
-```
-
-Use D's `ImportC` on that file. If ImportC chokes on macro-heavy code, fall back to
-manual `extern(C)` bindings for the public API surface (~20-30 functions). Both paths
-are low-effort given D's native C interop.
-
----
 
 ## Rendering Philosophy
 

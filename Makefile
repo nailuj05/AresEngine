@@ -10,6 +10,7 @@ BUILD   = build
 RUNTIME_SRC = $(shell find runtime/ -name '*.d')
 ENGINE_SRC  = $(shell find engine/  -name '*.d')
 EDITOR_SRC  = $(shell find editor/  -name '*.d')
+RAYLIB_D_SRC = $(shell find vendor/raylib/ -name '*.d')
 
 RUNTIME = $(BUILD)/runtime
 EDITOR  = $(BUILD)/editor
@@ -21,16 +22,16 @@ all: runtime
 # raygui
 RAYGUI_OBJ = $(BUILD)/raygui.o
 $(RAYGUI_OBJ): vendor/raygui/raygui.c | $(BUILD)
-	$(CC) -I$(RAYLIB_DIR)/include -c -o $@ $
+	$(CC) -I$(RAYLIB_DIR)/include -c -o $@ $<
 
 # runtime
 runtime: $(RUNTIME)
-$(RUNTIME): $(RUNTIME_SRC) $(ENGINE_SRC) | $(BUILD)
+$(RUNTIME): $(RUNTIME_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) | $(BUILD)
 	$(DC) $(DFLAGS) -of=$@ $^ $(LFLAGS)
 
 # editor -- engine + raygui
 editor: $(EDITOR)
-$(EDITOR): $(EDITOR_SRC) $(ENGINE_SRC) $(RAYGUI_OBJ) | $(BUILD)
+$(EDITOR): $(EDITOR_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) $(RAYGUI_OBJ) | $(BUILD)
 	$(DC) $(DFLAGS) -of=$@ $^ $(LFLAGS)
 
 $(BUILD):

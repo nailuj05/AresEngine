@@ -124,17 +124,13 @@ engine internals.
 
 ---
 
-## Build Phases
 
-Ordered to keep each phase independently testable before the next begins.
+## Lua Runtime Architecture
 
-| Phase | Deliverable                                           |
-|-------|-------------------------------------------------------|
-| 1     | Core loop, Raylib window, input                       |
-| 2     | Scene graph, Transform hierarchy                      |
-| 3     | Sprite/mesh renderer, orthographic camera, Z-sort     |
-| 4     | Asset cache (textures, sounds, fonts)                 |
-| 5     | Scene serialization / deserialization (JSON)          |
-| 6     | Lua VM wired to component lifecycle                   |
-| 7     | Editor UI via Clay (inspector first, then viewport)   |
-| 8     | Visual UI editor (most complex, least blocking)       |
+Lua scripting is implemented as a lightweight behavior layer on top of the engine’s native component system. The engine uses a single shared `lua_State*` for the entire runtime rather than creating a separate VM per script instance.
+
+Each `LuaScript` component loads a Lua module and creates its own per-instance table, allowing scripts to maintain isolated state while sharing the same VM efficiently. Script lifecycle callbacks (`onStart`, `onUpdate`, `onDestroy`) are invoked directly by the engine during the normal component update loop. 
+
+Engine functionality is exposed through a minimal, explicit API surface using userdata handles and binding functions rather than exposing internal engine structures directly. This keeps the scripting layer stable, safe, and easy to hot-reload. 
+
+Lua errors are isolated per component using protected calls (`lua_pcall`) so script failures do not crash the engine. The architecture is designed to support hot reloading, coroutines, and fast iteration.

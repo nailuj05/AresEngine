@@ -1,6 +1,6 @@
 module engine.core.component;
 
-import engine.scene.gameobject;
+import engine.core.gameobject;
 
 mixin template Named(string s)
 {

@@ -2,7 +2,7 @@ module editor.inspector.inspector;
 
 import raygui;
 import raylib;
-import engine.scene.gameobject;
+import engine.core.gameobject;
 import editor.style;
 
 enum INSPECTOR_W = 360;

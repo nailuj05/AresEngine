@@ -1,4 +1,4 @@
-module engine.scene.gameobject;
+module engine.core.gameobject;
 
 import engine.core.transform;
 import engine.core.component;

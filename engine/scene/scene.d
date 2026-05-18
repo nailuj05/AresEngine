@@ -1,7 +1,7 @@
 module engine.scene.scene;
 
 import std.algorithm.mutation : remove;
-import engine.scene.gameobject;
+import engine.core.gameobject;
 
 class Scene {
   string       name;

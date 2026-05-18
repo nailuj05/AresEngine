@@ -60,13 +60,14 @@ void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulon
   ox += 24;
 
   Rectangle labelRect = Rectangle(ox, oy, LABEL_W, FIELD_H);
-  Rectangle fieldRect = Rectangle(ox + LABEL_W + 4, oy,
-                                  INSPECTOR_W - LABEL_W - 12 - 24, FIELD_H);
+  Rectangle fieldRect = Rectangle(ox + LABEL_W + 4, oy, INSPECTOR_W - LABEL_W - 12 - 24, FIELD_H);
 
   GuiLabel(labelRect, name.toStringz);
 
   static if (is(T == bool)) {
-    GuiCheckBox(fieldRect, "".toStringz, &value);
+    // bool gets a small rectangle for the checkbox
+    Rectangle boolRect = Rectangle(ox + LABEL_W + 4, oy, FIELD_H, FIELD_H);
+    GuiCheckBox(boolRect, "".toStringz, &value);
   }
   else static if (is(T == int)) {
     if (GuiTextBox(fieldRect, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))

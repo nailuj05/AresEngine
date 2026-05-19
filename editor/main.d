@@ -9,6 +9,7 @@ import engine.scene.scene;
 import engine.renderer.meshrenderer;
 import editor.style;
 import editor.inspector.inspector;
+import editor.editorcamera;
 
 private Scene           activeScene;
 private GameObject      selected;
@@ -35,14 +36,9 @@ void main() {
   sceneTarget = LoadRenderTexture(vpW(), vpH());
   scope(exit) UnloadRenderTexture(sceneTarget);
 
-  editorCam = Camera3D(
-                       Vector3(0, 10, 10),  // position
-                       Vector3(0,  0,  0),  // target
-                       Vector3(0,  1,  0),  // up
-                       45.0f,
-                       CameraProjection.CAMERA_PERSPECTIVE
-                       );
-
+  editorCam = createEditorCamera();
+  
+  // TODO: This will be replaced with the loading of a proper scene
   activeScene      = new Scene();
   activeScene.name = "untitled";
   activeScene.createObject("Camera");
@@ -57,6 +53,8 @@ void main() {
     immutable float dt = GetFrameTime();
     activeScene.update(dt);
 
+    updateEditorCamera(editorCam);
+
     renderScene(activeScene);
 
     BeginDrawing();
@@ -70,7 +68,7 @@ void main() {
 
 void renderScene(Scene scene) {
   BeginTextureMode(sceneTarget);
-  ClearBackground(Colors.BLUE);
+  ClearBackground(Colors.DARKGRAY);
   BeginMode3D(editorCam);
   DrawGrid(20, 1.0f);
   // TODO: traverse scene and call each renderer component

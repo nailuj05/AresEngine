@@ -4,10 +4,11 @@ import engine.core.transform;
 import engine.core.component;
 
 class GameObject {
-  string      name;
-  bool        active = true;
-  Transform   transform;
-  Component[] components;
+  string       name;
+  bool         active = true;
+  Transform    transform;
+  Component[]  components;
+  GameObject[] children;
 
   private bool started = false;
   

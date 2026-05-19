@@ -7,5 +7,4 @@ struct Transform {
     Quaternion rotation = Quaternion(0, 0, 0, 1); // identity
     Vector3    scale    = Vector3(1, 1, 1);
     Transform* parent;
-    Transform*[] children;
 }

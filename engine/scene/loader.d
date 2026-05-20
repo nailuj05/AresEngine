@@ -4,11 +4,13 @@ import std.json;
 import std.file   : readText, write;
 import std.traits : FieldNameTuple, Unqual;
 import std.meta   : AliasSeq;
+
+import raylib : Vector3, Quaternion;
+
 import engine.scene.scene;
 import engine.core.gameobject;
 import engine.core.component;
 import engine.core.transform;
-import raylib : Vector3, Quaternion;
 
 
 // known components
@@ -16,6 +18,7 @@ import raylib : Vector3, Quaternion;
 import engine.renderer.meshrenderer;
 alias KnownComponents = AliasSeq!(MeshRenderer);
 
+// TODO: @DontSerialize Field
 
 // public API
 

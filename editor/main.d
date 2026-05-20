@@ -17,15 +17,17 @@ import editor.inspector.inspector;
 import editor.viewport.viewport;
 import editor.hierarchy.hierarchy;
 import editor.editorcamera;
+import editor.filedialog;
 
 private Scene           activeScene;
 private GameObject      selected;
 private RenderTexture2D sceneTarget;
 private Camera3D        editorCam;
 
-enum TOP_BAR_SIZE = 24;
-
+private FileDialog fileDialog;
 private bool exitRequested;
+
+enum TOP_BAR_SIZE = 24;
 
 void main() {
   initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", 60));
@@ -61,7 +63,10 @@ void main() {
 
     computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
 
-    updateEditorCamera(editorCam, viewport);
+    if (!fileDialog.active) // camera should not move when file dialog is open
+      updateEditorCamera(editorCam, viewport);
+
+    // resize viewport rt if viewport size changed
     if (viewport.width != sceneTarget.texture.width || viewport.height != sceneTarget.texture.height)
       resizeSceneTarget(sceneTarget, cast(int)viewport.width, cast(int)viewport.height);
  
@@ -74,6 +79,8 @@ void main() {
       drawInspector(inspector, selected);
       drawFolder(folder);
       auto action = drawTopBar(topBar, activeScene.name);
+
+      drawFileDialog(fileDialog);
     EndDrawing();
 
     // handle action from topbar
@@ -86,7 +93,7 @@ void main() {
 
 void renderScene(Scene scene) {
   BeginTextureMode(sceneTarget);
-  ClearBackground(Colors.DARKGRAY);
+  ClearBackground(Color(60, 60, 60, 255));
   BeginMode3D(editorCam);
     DrawGrid(20, 1.0f);
     scene.draw();
@@ -104,14 +111,27 @@ void drawFolder(Rectangle r) {
   GuiPanel(r, "Project Folder");
 }
 
+void drawFileDialog(ref FileDialog fileDialog) {
+  if (fileDialog.active) {
+    if (fileDialog.draw()) {
+      if (!fileDialog.cancelled) {
+        final switch (fileDialog.mode) {
+        case FileDialogMode.Open: loadScene(fileDialog.result);                break;
+        case FileDialogMode.Save: saveScene(activeScene, fileDialog.result);   break;
+        }
+      }
+    }
+  }
+}
+
       
 // TopBar Handlers
 void handleProject(int item) {
   switch (item) {
   case 0: /*New*/ break;
-  case 1: /*Open*/ break;
-  case 2: saveScene(activeScene, "test.json"); break;
-  case 3: /*Save As*/ break;
+  case 1: fileDialog.show(FileDialogMode.Open, "", ".json"); break;
+  case 2: saveScene(activeScene, activeScene.name ~ ".json"); break;
+  case 3: fileDialog.show(FileDialogMode.Save, "", ".json"); break;
   case 4: exitRequested = true; break;
   default: break;
   }

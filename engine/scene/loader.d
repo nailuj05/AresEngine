@@ -1,6 +1,7 @@
 module engine.scene.loader;
 
 import std.json;
+import std.stdio  : writeln;
 import std.file   : readText, write;
 import std.traits : FieldNameTuple, Unqual;
 import std.meta   : AliasSeq;
@@ -31,7 +32,14 @@ void saveScene(Scene scene, string path) {
 }
 
 Scene loadScene(string path) {
-  auto jsonT = parseJSON(readText(path));
+  JSONValue jsonT;
+  try {
+    jsonT = parseJSON(readText(path));
+  } catch (Exception e) {
+    writeln("Failure opening scene");
+    return null;
+  }
+
   auto scene = new Scene(jsonT["name"].str);
   
   foreach (goJson; jsonT["roots"].array) {

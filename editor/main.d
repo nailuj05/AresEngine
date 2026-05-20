@@ -39,8 +39,7 @@ void main() {
   editorCam = createEditorCamera();
   
   // TODO: This will be replaced with the loading of a proper scene
-  activeScene      = new Scene();
-  activeScene.name = "untitled";
+  activeScene      = new Scene("untitled");
   activeScene.createObject("Camera");
   auto player = activeScene.createObject("Player");
   auto mesh   = player.addComponent!MeshRenderer();

@@ -61,7 +61,7 @@ void updateEditorCamera(ref Camera3D cam) {
     float phi   = asin(clamp(offset.y / dist, -1.0f, 1.0f));
 
     theta -= delta.x * SENSITIVITY;
-    phi    = clamp(phi - delta.y * SENSITIVITY, -PITCH_LIMIT, PITCH_LIMIT);
+    phi    = clamp(phi + delta.y * SENSITIVITY, -PITCH_LIMIT, PITCH_LIMIT);
 
     import std.math : cos, sin;
     cam.position = Vector3Add(cam.target, Vector3(

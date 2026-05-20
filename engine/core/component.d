@@ -4,6 +4,7 @@ import engine.core.gameobject;
 
 mixin template Named(string s)
 {
+  enum string typeName = s; // for serialization
   override @property string name() const
   {
     return s;

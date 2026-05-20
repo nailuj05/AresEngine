@@ -5,18 +5,18 @@ import raylib;
 import engine.core.gameobject;
 import editor.style;
 
-enum INSPECTOR_W = 360;
-
 // Use proper constants for styling and spacing
-void drawInspector(GameObject selected, immutable int x, immutable int h) {
-  DrawRectangle(x, 0, INSPECTOR_W, h, GetColor(PANEL_BG));
-  GuiPanel(Rectangle(x, 0, INSPECTOR_W, h), "Inspector");
+void drawInspector(Rectangle r, GameObject selected) {
+  import std.string : toStringz;
+
+  DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
+  GuiPanel(r, "Inspector");
 
   if (selected is null) return;
-  GuiLabel(Rectangle(x + 4, 32, INSPECTOR_W - 8, 20), selected.name.ptr);
+  GuiLabel(Rectangle(r.x + 4, r.y + 32, r.width - 8, 20), selected.name.toStringz);
 
   foreach (i, component; selected.components) {
-    GuiLabel(Rectangle(x + 12, 32 * i + 64, INSPECTOR_W - 8, 20), component.name.ptr);
-    component.drawInspector(x, 32 * i + 96);
+    GuiLabel(Rectangle(r.x + 12, r.y + 32 * i + 64, r.width - 8, 20), component.name.toStringz);
+    component.drawInspector(cast(ulong)r.x, cast(ulong)(r.y + 32 * i + 96), cast(ulong)r.width);
   }
 }

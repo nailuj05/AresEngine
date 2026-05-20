@@ -4,7 +4,7 @@ import raylib;
 import raygui;
 
 enum PANEL_BG    = 0x252526ff;
-enum TEXT_SZ     = 22;
+enum TEXT_SZ     = 20;
 
 void setDarkTheme()
 {

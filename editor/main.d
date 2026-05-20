@@ -2,13 +2,18 @@ module main;
 
 import raylib;
 import raygui;
+
 import engine.core.window;
 import engine.core.component;
 import engine.core.gameobject;
 import engine.scene.scene;
 import engine.renderer.meshrenderer;
+
 import editor.style;
+import editor.layout;
 import editor.inspector.inspector;
+import editor.viewport.viewport;
+import editor.hierarchy.hierarchy;
 import editor.editorcamera;
 
 private Scene           activeScene;
@@ -16,24 +21,22 @@ private GameObject      selected;
 private RenderTexture2D sceneTarget;
 private Camera3D        editorCam;
 
-enum HIERARCHY_W = 220;
-
-int vpX() { return HIERARCHY_W; }
-int vpW() { return GetScreenWidth()  - HIERARCHY_W - INSPECTOR_W; }
-int vpH() { return GetScreenHeight(); }
-
+enum TOP_BAR_SIZE = 20;
 
 void main() {
-  initWindow(WindowConfig(1600, 900, "AresEngine - Editor", 60));
+  initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", 60));
 
   Font font = LoadFontEx("vendor/fonts/Inter.ttf", TEXT_SZ, null, 0);
   GuiSetFont(font);
 
   setDarkTheme();
 
+  Rectangle topBar, hierarchy, viewport, inspector, folder;
+  computeLayout(TOP_BAR_SIZE, 0.15f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
+  
   scope(exit) closeWindow();
 
-  sceneTarget = LoadRenderTexture(vpW(), vpH());
+  sceneTarget = LoadRenderTexture(cast(int)viewport.width, cast(int)viewport.height);
   scope(exit) UnloadRenderTexture(sceneTarget);
 
   editorCam = createEditorCamera();
@@ -47,20 +50,26 @@ void main() {
   mesh.color  = Colors.RED;
 
   activeScene.start();
-    
+
   while (!shouldClose()) {
     immutable float dt = GetFrameTime();
     activeScene.update(dt);
 
-    updateEditorCamera(editorCam);
+    computeLayout(TOP_BAR_SIZE, 0.15f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
 
+    updateEditorCamera(editorCam, viewport);
+    if (viewport.width != sceneTarget.texture.width || viewport.height != sceneTarget.texture.height)
+      resizeSceneTarget(sceneTarget, cast(int)viewport.width, cast(int)viewport.height);
+ 
     renderScene(activeScene);
 
     BeginDrawing();
-      ClearBackground(Colors.PINK);
-      drawHierarchy();
-      drawViewport();
-      drawInspector(selected, GetScreenWidth() - INSPECTOR_W, GetScreenHeight());
+      ClearBackground(Colors.BLACK);
+      drawTopBar(topBar);
+      drawHierarchy(hierarchy, activeScene, selected);
+      drawViewport(viewport, sceneTarget);
+      drawInspector(inspector, selected);
+      drawFolder(folder);
     EndDrawing();
   }
 }
@@ -69,32 +78,38 @@ void renderScene(Scene scene) {
   BeginTextureMode(sceneTarget);
   ClearBackground(Colors.DARKGRAY);
   BeginMode3D(editorCam);
-  DrawGrid(20, 1.0f);
-  // TODO: traverse scene and call each renderer component
-  scene.draw();
+    DrawGrid(20, 1.0f);
+    scene.draw();
   EndMode3D();
   EndTextureMode();
 }
 
-void drawHierarchy() {
-  immutable int h = GetScreenHeight();
-  DrawRectangle(0, 0, HIERARCHY_W, h, GetColor(PANEL_BG));
-  GuiPanel(Rectangle(0, 0, HIERARCHY_W, h), "Hierarchy");
-
-  int y = 28;
-  foreach (go; activeScene.roots) {
-    if (GuiButton(Rectangle(4, y, HIERARCHY_W - 8, 22), go.name.ptr))
-      selected = go;
-    y += 26;
-  }
+void resizeSceneTarget(ref RenderTexture2D target, int w, int h) {
+    UnloadRenderTexture(target);
+    target = LoadRenderTexture(w, h);
 }
 
-void drawViewport() {
-  // RenderTexture is stored upside-down in OpenGL -> negative height flips it
-  immutable Rectangle src  = Rectangle(0, 0,  cast(float)  sceneTarget.texture.width,
-                                       -cast(float)  sceneTarget.texture.height);
-  immutable Rectangle dest = Rectangle(vpX(), TEXT_SZ + 2, vpW(), vpH());
-  GuiPanel(Rectangle(vpX(), 0, vpW(), vpH()), "Viewport");
-  DrawTexturePro(sceneTarget.texture, src, dest, Vector2(0, 0), 0.0f, Colors.WHITE);
+void drawTopBar(Rectangle r) {
+    DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
+
+    enum BUTTON_W = 80;
+    enum BUTTON_PAD = 0;
+    float x = r.x + BUTTON_PAD;
+
+    if (GuiButton(Rectangle(x, r.y + BUTTON_PAD, BUTTON_W, r.height - BUTTON_PAD * 2), "File"))
+        {} // open file menu
+    x += BUTTON_W + BUTTON_PAD;
+
+    if (GuiButton(Rectangle(x, r.y + BUTTON_PAD, BUTTON_W, r.height - BUTTON_PAD * 2), "Edit"))
+        {}
+    x += BUTTON_W + BUTTON_PAD;
+
+    if (GuiButton(Rectangle(x, r.y + BUTTON_PAD, BUTTON_W, r.height - BUTTON_PAD * 2), "Scene"))
+        {}
+    x += BUTTON_W + BUTTON_PAD;
 }
 
+void drawFolder(Rectangle r) {
+  DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
+  GuiPanel(r, "Project Folder");
+}

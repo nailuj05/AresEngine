@@ -11,7 +11,7 @@ Camera3D createEditorCamera() {
                   );
 }
 
-void updateEditorCamera(ref Camera3D cam) {
+void updateEditorCamera(ref Camera3D cam, Rectangle r) {
   import std.math             : atan2, asin, sin, cos, PI;
   import std.algorithm        : clamp;
 
@@ -30,8 +30,17 @@ void updateEditorCamera(ref Camera3D cam) {
                                    Vector3Scale(Vector3Normalize(toTarget), dist));
   }
 
-  if (!IsMouseButtonDown(MouseButton.MOUSE_BUTTON_LEFT)) return;
+  static bool dragStartedInViewport = false;
 
+  if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT))
+    dragStartedInViewport = CheckCollisionPointRec(GetMousePosition(), r);
+
+  if (!IsMouseButtonDown(MouseButton.MOUSE_BUTTON_LEFT)) {
+    dragStartedInViewport = false;
+    return;
+  }
+  if (!dragStartedInViewport) return;
+  
   Vector2 delta = GetMouseDelta();
   if (delta.x == 0 && delta.y == 0) return;
 

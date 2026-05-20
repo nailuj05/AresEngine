@@ -2,8 +2,10 @@ module editor.inspector.drawer;
 
 import std.format: format;
 import std.string: toStringz;
+
 import raygui;
 import raylib;
+
 import editor.inspector.inspector;
 
 enum MAX_FIELD_BUFFER = 256;
@@ -14,7 +16,7 @@ struct FieldState {
   bool editing;
 }
 
-void drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy) {
+void drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy, ulong panelWidth) {
   ulong row = 0;
   foreach (i, ref field; obj.tupleof) {
     static if (__traits(getProtection, obj.tupleof[i]) == "public") {
@@ -26,7 +28,7 @@ void drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy)
         states[name] = s;
       }
       
-      drawField(name, field, states[name], ox, oy + row * 32);
+      drawField(name, field, states[name], ox, oy + row * 32, panelWidth);
       row++;
     }
   }
@@ -50,7 +52,7 @@ void initFieldState(T)(ref FieldState state, ref T value) {
   state.initialized = true;
 }
 
-void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulong oy) {
+void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulong oy, ulong panelWidth) {
   import std.format : format;
   import std.string : toStringz, fromStringz;
   import std.conv : to;
@@ -60,7 +62,7 @@ void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulon
   ox += 24;
 
   Rectangle labelRect = Rectangle(ox, oy, LABEL_W, FIELD_H);
-  Rectangle fieldRect = Rectangle(ox + LABEL_W + 4, oy, INSPECTOR_W - LABEL_W - 12 - 24, FIELD_H);
+  Rectangle fieldRect = Rectangle(ox + LABEL_W + 4, oy, panelWidth - LABEL_W - 12 - 24, FIELD_H);
 
   GuiLabel(labelRect, name.toStringz);
 
@@ -91,7 +93,7 @@ void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulon
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
   }
-  else {
-    GuiLabel(fieldRect, format!"%s"(value).toStringz);
-  }
+  // else {
+  //   GuiLabel(fieldRect, format!"%s"(value).toStringz);
+  // }
 }

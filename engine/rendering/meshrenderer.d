@@ -34,9 +34,9 @@ class MeshRenderer : Component {
 
     private FieldState[string] fieldStates;
     
-    override void drawInspector(ulong offsetX, ulong offsetY) {
+    override void drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {
       auto self = this;
-      drawFields(self, fieldStates, offsetX, offsetY);
+      drawFields(self, fieldStates, offsetX, offsetY, panelW);
     }
   }
 }

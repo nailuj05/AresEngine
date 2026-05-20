@@ -37,5 +37,8 @@ $(EDITOR): $(EDITOR_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) $(RAYGUI_OBJ) | $(BUILD)
 $(BUILD):
 	mkdir -p $(BUILD)
 
+run-editor:	editor
+	./build/editor
+
 clean:
 	rm -rf $(BUILD)

@@ -21,6 +21,6 @@ abstract class Component {
   void onDestroy()        {}
 
   version(Editor) {
-    abstract void drawInspector(ulong offsetX, ulong offsetY) {}
+    abstract void drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {}
   }
 }

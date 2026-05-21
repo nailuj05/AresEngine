@@ -130,13 +130,12 @@ public:
                    440.0f, 320.0f
                    );
 
-    if (initPath.length && isDir(initPath))
+    if (initPath.length && isDir(initPath)) {
       dir = initPath;
-    else if (initPath.length && exists(initPath)) {
+    } else if (initPath.length && exists(initPath)) {
       dir      = dirName(initPath);
       fileName = baseName(initPath);
-    }
-    else {
+    } else {
       dir      = getcwd();
       fileName = "";
     }

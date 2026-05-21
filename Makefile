@@ -38,7 +38,7 @@ $(BUILD):
 	mkdir -p $(BUILD)
 
 run-editor:	editor
-	./build/editor
+	./build/editor --test
 
 clean:
 	rm -rf $(BUILD)

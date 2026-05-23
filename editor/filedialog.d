@@ -185,11 +185,14 @@ public:
     }
 
     //  Directory text box 
-    if (GuiTextBox(Rectangle(b.x + 8, b.y + 36, b.width - 56, 24),
-                   dirBuf.ptr, cast(int)dirBuf.length, dirEdit)) {
+    if (GuiTextBox(Rectangle(b.x + 8, b.y + 36, b.width - 56, 24), dirBuf.ptr, cast(int)dirBuf.length, dirEdit)) {
       if (dirEdit) {
-        string typed = fromStringz(dirBuf.ptr).idup; if (isDir(typed)) { dir = typed; reloadDir(); }
-        else              fillBuf(dirBuf[], dir);  // reject invalid
+        string typed = fromStringz(dirBuf.ptr).idup;
+        if (isDir(typed)) {
+          dir = typed; reloadDir();
+        } else {
+          fillBuf(dirBuf[], dir);  // reject invalid
+        }
       }
       dirEdit = !dirEdit;
     }
@@ -200,15 +203,8 @@ public:
     GuiSetStyle(GuiControl.LISTVIEW, GuiControlProperty.TEXT_ALIGNMENT,     GuiTextAlignment.TEXT_ALIGN_LEFT);
     GuiSetStyle(GuiControl.LISTVIEW, GuiListViewProperty.LIST_ITEMS_HEIGHT, 24);
 
-    Rectangle listR = Rectangle(
-                                b.x + 8,
-                                b.y + 68,
-                                b.width - 16,
-                                b.height - 68 - 16 - 76   // leave room for two bottom rows
-                                );
-    GuiListViewEx(listR, cPtrs.ptr, cast(int)labels.length,
-                  &scroll, &sel, &focus);
-
+    Rectangle listR = Rectangle(b.x + 8, b.y + 68, b.width - 16, b.height - 68 - 16 - 76);
+    GuiListViewEx(listR, cPtrs.ptr, cast(int)labels.length, &scroll, &sel, &focus);
 
     GuiSetStyle(GuiControl.LISTVIEW, GuiControlProperty.TEXT_ALIGNMENT,     prevAlign);
     GuiSetStyle(GuiControl.LISTVIEW, GuiListViewProperty.LIST_ITEMS_HEIGHT, prevHeight);
@@ -237,8 +233,7 @@ public:
     float bw  = b.width;
 
     GuiLabel(Rectangle(bx + 8, bot - 76, 140, 24), "File name:");
-    if (GuiTextBox(Rectangle(bx + 100, bot - 76, bw - 210, 24),
-                   nameBuf.ptr, cast(int)nameBuf.length, nameEdit)) {
+    if (GuiTextBox(Rectangle(bx + 100, bot - 76, bw - 210, 24), nameBuf.ptr, cast(int)nameBuf.length, nameEdit)) {
       if (nameEdit) fileName = fromStringz(nameBuf.ptr).idup;
       nameEdit = !nameEdit;
     }

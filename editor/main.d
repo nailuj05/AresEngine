@@ -191,7 +191,7 @@ int main(string[] args) {
       drawViewport(viewport, sceneTarget);
       drawInspector(inspector, selected);
       drawFolder(folder);
-      if (activeMenu >= 0) GuiSetState(GuiState.STATE_NORMAL);
+      GuiSetState(GuiState.STATE_NORMAL);
       auto action = drawTopBar(topBar, activeScene.name);
 
       drawSettingsDialog(settingsDialog);

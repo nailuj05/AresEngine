@@ -103,7 +103,7 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
   syncBuffer(state, value);
   Rectangle lr = Rectangle(ox + 8, oy, LABEL_W, FIELD_H);
   Rectangle fr = Rectangle(ox + 8 + LABEL_W + 4, oy, pw - LABEL_W - 20, FIELD_H);
-  GuiLabel(lr, label.toStringz);
+  GuiLabel(lr, label.humanize().toStringz());
 
   static if (is(T == bool)) {
     GuiCheckBox(Rectangle(fr.x, oy, FIELD_H, FIELD_H), "".toStringz, &value);
@@ -157,4 +157,20 @@ ulong drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy
   }
   if (deferred) deferred();
   return cast(ulong)y;
+}
+
+string humanize(string s) {
+  import std.uni : isUpper;
+  import std.array : appender;
+  import std.ascii : toUpper;
+  if (s.length == 0)
+    return s;
+  auto o = appender!string();
+  o.put(cast(char) toUpper(s[0]));
+  foreach (i; 1 .. s.length) {
+    if (isUpper(s[i]))
+      o.put(' ');
+    o.put(s[i]);
+  }
+  return o.data;
 }

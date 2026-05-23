@@ -63,16 +63,14 @@ MenuAction drawTopBar(Rectangle r, string sceneName) {
   enum DROPDOWN_W = 140;
   enum SEP_H      = 8;
 
-  DrawRectangle(cast(int)r.x, cast(int)r.y,
-                cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
+  DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
 
   // Build button rects once so we can reuse them for hit-testing below.
   Rectangle[MENUS.length] btnRects;
   {
     float x = r.x + BUTTON_PAD;
     foreach (i; 0 .. MENUS.length) {
-      btnRects[i] = Rectangle(x, r.y + BUTTON_PAD,
-                              BUTTON_W, r.height - BUTTON_PAD * 2);
+      btnRects[i] = Rectangle(x, r.y + BUTTON_PAD, BUTTON_W, r.height - BUTTON_PAD * 2);
       x += BUTTON_W + BUTTON_PAD;
     }
   }

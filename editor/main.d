@@ -23,6 +23,7 @@ import editor.topbar;
 import editor.filedialog;
 import editor.settingsdialog;
 import editor.editorcamera;
+import editor.viewport.gizmos;
 import editor.viewport.viewport;
 import editor.inspector.inspector;
 import editor.hierarchy.hierarchy;
@@ -42,6 +43,7 @@ private RenderTexture2D sceneTarget;
 private Camera3D        editorCam;
 
 // Editor
+private GizmoState gizmo;
 private FileDialog fileDialog;
 private SettingsDialog settingsDialog;
 private bool exitRequested;
@@ -168,13 +170,16 @@ int main(string[] args) {
 
     computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
 
-    if (!fileDialog.active && !settingsDialog.active) // camera should not move when file dialog is open
+    if (!fileDialog.active && !settingsDialog.active && !gizmo.dragging) // camera should not move when file dialog is open
       updateEditorCamera(editorCam, viewport);
 
     // resize viewport rt if viewport size changed
     if (viewport.width != sceneTarget.texture.width || viewport.height != sceneTarget.texture.height)
       resizeSceneTarget(sceneTarget, cast(int)viewport.width, cast(int)viewport.height);
  
+    if (selected !is null)
+      updateGizmo(gizmo, viewport, editorCam, selected);
+    
     // TODO: obviously dont update the game while in editor, this is only for testing
     activeScene.update(dt);
     renderScene(activeScene);
@@ -217,6 +222,9 @@ void renderScene(Scene scene) {
   BeginMode3D(editorCam);
     DrawGrid(20, 1.0f);
     scene.draw();
+    if (selected !is null) {
+      drawGizmo(gizmo, selected.transform.position, editorCam);
+    }
   EndMode3D();
   EndTextureMode();
 }

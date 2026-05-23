@@ -59,11 +59,11 @@ void log(T...)(T args) {
 int main(string[] args) {
   // getopt
   string path;
-  bool help, test, newp;
-  getopt(args, "help|h", &help, "new|n", &newp, "test|d", &test);
+  bool help, test, profile, newp;
+  getopt(args, "help|h", &help, "new|n", &newp, "profile|p", &profile, "test|d", &test);
 
   if (help) {
-    log("usage: editor [--new] [--test] <path>");
+    log("usage: editor [--new] [--profile] [--test] <path>");
     return 0;
   }
 
@@ -119,7 +119,7 @@ int main(string[] args) {
 
   // Init Editor
   SetTraceLogLevel(TraceLogLevel.LOG_WARNING);
-  initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", 60));
+  initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", -1));
   // SetExitKey(KeyboardKey.KEY_NULL);
 
   Font font = LoadFontFromMemory(".ttf", FONT_DATA.ptr, cast(int)FONT_DATA.length, TEXT_SZ, null, 0);
@@ -196,6 +196,7 @@ int main(string[] args) {
 
       drawSettingsDialog(settingsDialog);
       drawFileDialog(fileDialog);
+      if (profile) DrawFPS(GetScreenWidth() - 100, 2);
     EndDrawing();
 
     // handle action from topbar

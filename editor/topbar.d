@@ -20,22 +20,27 @@ struct MenuDef {
 
 immutable MenuDef[] MENUS = [
   MenuDef("Project", [
+    MenuItem("Save"),
+    MenuItem("Settings"),
+    MenuItem("Exit"),
+  ]),
+  // MenuDef("Edit", [
+  //   MenuItem("Undo"),
+  //   MenuItem("Redo"),
+  //   MenuItem("Cut"),
+  //   MenuItem("Copy"),
+  //   MenuItem("Paste"),
+  // ]),
+  MenuDef("Scene", [
     MenuItem("New"),
     MenuItem("Open"),
     MenuItem("Save"),
     MenuItem("Save As"),
-    MenuItem("Exit"),
   ]),
-  MenuDef("Edit", [
-    MenuItem("Undo"),
-    MenuItem("Redo"),
-    MenuItem("Cut"),
-    MenuItem("Copy"),
-    MenuItem("Paste"),
-  ]),
-  MenuDef("Scene", [
-    MenuItem("Add Object"),
-    MenuItem("Remove Object"),
+  MenuDef("GameObject", [
+    MenuItem("Add Empty"),
+    MenuItem("Add Plane"),
+    MenuItem("Add Cube"),
     MenuItem("Scene Settings"),
   ]),
 ];
@@ -52,7 +57,7 @@ struct MenuAction {
 MenuAction drawTopBar(Rectangle r, string sceneName) {
   MenuAction result;
 
-  enum BUTTON_W   = 80;
+  enum BUTTON_W   = 140;
   enum BUTTON_PAD = 0;
   enum ITEM_H     = 24;
   enum DROPDOWN_W = 140;

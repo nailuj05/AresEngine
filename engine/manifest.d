@@ -1,26 +1,36 @@
 module engine.manifest;
 
 import std.json;
+import std.conv      : to;
+import std.range     : zip;
+import std.string    : split;
+import std.typecons  : tuple;
 import std.algorithm : cmp, map, max;
-import std.array : array;
-import std.conv : to;
-import std.string : split;
-import std.range : zip;
+import std.array     : array , assocArray;
 
-class Manifest {
-public:
+struct Manifest {
   string projectName;
   string projectVersion;
 
+  string[string] projectScenes;
+
   this(string json) {
     JSONValue parsed = parseJSON(json);
+
     this.projectName    = parsed["name"].str;
     this.projectVersion = parsed["version"].str;
+
+    foreach (k, v; parsed["scenes"].object)
+        this.projectScenes[k] = v.str;
   }
 
-  string asJson() {
-    JSONValue j = ["name": JSONValue(projectName), "version": JSONValue(projectVersion)];
-    return j.toString();
+  string toString() {
+    JSONValue j = [
+      "name":    JSONValue(projectName),
+      "version": JSONValue(projectVersion),
+      "scenes":  JSONValue(projectScenes)
+    ];
+    return j.toPrettyString();
   }
 }
 

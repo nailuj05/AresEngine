@@ -1,5 +1,6 @@
 module editor.inspector.drawer;
 
+import std.array;
 import std.format: format;
 import std.string: toStringz;
 
@@ -16,8 +17,9 @@ struct FieldState {
   bool editing;
 }
 
-void drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy, ulong panelWidth) {
+ulong drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy, ulong panelWidth) {
   ulong row = 0;
+  void delegate() deferredDropdown = null;
   foreach (i, ref field; obj.tupleof) {
     static if (__traits(getProtection, obj.tupleof[i]) == "public") {
       enum name = __traits(identifier, obj.tupleof[i]);
@@ -28,10 +30,12 @@ void drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy,
         states[name] = s;
       }
       
-      drawField(name, field, states[name], ox, oy + row * 32, panelWidth);
+      drawField(name, field, states[name], ox, oy + row * 32, panelWidth, &deferredDropdown);
       row++;
     }
   }
+  if (deferredDropdown) deferredDropdown();
+  return row * 32 + oy;
 }
 
 void initFieldState(T)(ref FieldState state, ref T value) {
@@ -52,7 +56,7 @@ void initFieldState(T)(ref FieldState state, ref T value) {
   state.initialized = true;
 }
 
-void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulong oy, ulong panelWidth) {
+void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulong oy, ulong panelWidth, void delegate()* deferred = null) {
   import std.format : format;
   import std.string : toStringz, fromStringz;
   import std.conv : to;
@@ -92,6 +96,29 @@ void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulon
       state.editing = !state.editing;
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
+  }
+  else static if (is(T == enum)) {
+    import std.traits : EnumMembers;
+
+    // build "X;Y;Z" at compile time
+    enum optionStr = [__traits(allMembers, T)].join(";");
+
+    int active = 0;
+    static foreach (i, member; EnumMembers!T)
+      if (value == member) active = cast(int) i;
+
+    if (state.editing && deferred) {
+      // defer the open dropdown to after all fields are drawn (will still overlap in certain situations, design components to avoid it)
+      *deferred = () {
+        if (GuiDropdownBox(fieldRect, optionStr.ptr, &active, true))
+          state.editing = false;
+        static foreach (i, member; EnumMembers!T)
+          if (active == cast(int) i) value = member;
+      };
+    } else {
+      if (GuiDropdownBox(fieldRect, optionStr.ptr, &active, false))
+        state.editing = true;
+    }
   }
   // else {
   //   GuiLabel(fieldRect, format!"%s"(value).toStringz);

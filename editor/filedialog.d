@@ -125,10 +125,11 @@ public:
     nameEdit = false;
 
     b = Rectangle(
-                   GetScreenWidth()  / 2.0f - 220.0f,
-                   GetScreenHeight() / 2.0f - 155.0f,
-                   440.0f, 320.0f
-                   );
+      GetScreenWidth()  / 2.0f - 440.0f,
+      GetScreenHeight() / 2.0f - 320.0f,
+      880.0f, 640.0f
+    );
+    
 
     if (initPath.length && isDir(initPath)) {
       dir = initPath;

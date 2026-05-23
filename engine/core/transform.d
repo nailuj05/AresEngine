@@ -8,3 +8,9 @@ struct Transform {
     Vector3    scale    = Vector3(1, 1, 1);
     Transform* parent;
 }
+
+enum Axis {
+  X = 0,
+  Y = 1,
+  Z = 2,
+}

@@ -49,5 +49,8 @@ class GameObject {
   void destory() {
     foreach (c; components)
       c.onDestroy();
+
+    foreach (go; children)
+      go.destroy();
   }
 }

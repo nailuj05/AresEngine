@@ -1,7 +1,7 @@
 module engine.renderer.meshrenderer;
 
 import raylib;
-import std.stdio;
+
 import engine.core.component;
 
 class MeshRenderer : Component {
@@ -34,9 +34,9 @@ class MeshRenderer : Component {
 
     private FieldState[string] fieldStates;
     
-    override void drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {
+    override ulong drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {
       auto self = this;
-      drawFields(self, fieldStates, offsetX, offsetY, panelW);
+      return drawFields(self, fieldStates, offsetX, offsetY, panelW);
     }
   }
 }

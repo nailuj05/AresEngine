@@ -17,7 +17,8 @@ import engine.core.transform;
 // known components
 
 import engine.renderer.meshrenderer;
-alias KnownComponents = AliasSeq!(MeshRenderer);
+import engine.oscillator;
+alias KnownComponents = AliasSeq!(MeshRenderer, Oscillator);
 
 // TODO: @DontSerialize Field
 

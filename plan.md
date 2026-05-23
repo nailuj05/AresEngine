@@ -40,13 +40,11 @@ engine/              -- static or shared library
   scene/             -- scene graph, serialization
   renderer/          -- Raylib wrapper, camera, Z-sort
   scripting/         -- Lua VM + engine bindings
-  ui/                -- Clay bindings + Clay render backend
 
 editor/              -- standalone binary, links engine
   inspector/         -- property panel, component editing
   viewport/          -- scene view, gizmos
   assets/            -- asset browser
-  uilayout/          -- visual UI editor (Clay layouts)
 
 runtime/             -- thin game binary, links engine
   main.d             -- load scene, run loop
@@ -72,7 +70,6 @@ struct Transform {
     Quaternion rotation;
     Vector3    scale;
     Transform* parent;
-    Transform*[] children;
 }
 
 class GameObject {
@@ -80,6 +77,7 @@ class GameObject {
     bool        active;
     Transform   transform;
     Component[] components;
+    GameObject*[] children;
 }
 
 class Component {
@@ -88,6 +86,7 @@ class Component {
 
     void onStart()   {}
     void onUpdate()  {}
+    void onDraw()    {}
     void onDestroy() {}
 }
 ```
@@ -104,26 +103,10 @@ class LuaScript      : Component { string scriptPath; LuaState* L; }
 
 - Components own their own update logic (virtual `onUpdate`), not processed by external systems
 - Scene is a flat `GameObject[]` root list; hierarchy is expressed through `Transform.parent/children`
-- No ECS -- data-oriented optimization deferred until profiling demands it
+- No ECS
 - Serialization is straightforward: iterate GameObjects, iterate components, dump fields
 
 ---
-
-## Lua Scripting
-
-`LuaScript` is a first-class component. Each instance owns a `LuaState*` and a path to
-a `.lua` file. The engine calls lifecycle hooks into Lua at the appropriate points.
-
-Benefits:
-- Clean separation of logic from structure
-- Hot-reload is almost free
-- Maps naturally onto the component model
-
-The binding surface should be kept minimal and explicit. Lua should not reach deep into
-engine internals.
-
----
-
 
 ## Lua Runtime Architecture
 

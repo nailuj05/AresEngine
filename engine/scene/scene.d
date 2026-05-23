@@ -10,7 +10,6 @@ class Scene {
   this(string name) {
     this.name = name;
   }
-  // TODO: destroy scene in ~this or call manually? 
   
   GameObject createObject(string goName = "GameObject") {
     auto go = new GameObject();
@@ -41,6 +40,9 @@ class Scene {
   }
 
   void destroy() {
-    // destory entire scene (unload)
+    foreach (go; roots)
+      go.destroy();
+
+    roots = [];
   }
 }

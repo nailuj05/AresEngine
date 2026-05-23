@@ -1,8 +1,7 @@
 DC      = dmd
 CC      = gcc
 RAYLIB_DIR  = vendor/raylib-6.0_linux_amd64
-DFLAGS  = -I=vendor \
-          -I=engine
+DFLAGS  = -I=vendor -I=engine -J=assets
 LFLAGS  = $(RAYLIB_DIR)/lib/libraylib.a \
           -L-lGL -L-lm -L-lpthread -L-ldl -L-lrt -L-lX11
 BUILD   = build

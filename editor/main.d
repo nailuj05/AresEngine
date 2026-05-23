@@ -27,6 +27,10 @@ import editor.viewport.viewport;
 import editor.inspector.inspector;
 import editor.hierarchy.hierarchy;
 
+// Comp-time embedded assets
+static immutable ubyte[] FONT_DATA  = cast(immutable ubyte[]) import("fonts/Inter.ttf");
+static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("icons/logo-icon.png");
+
 // Project
 private string   projectPath;
 private scope Manifest projectManifest;
@@ -116,8 +120,10 @@ int main(string[] args) {
   initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", 60));
   // SetExitKey(KeyboardKey.KEY_NULL);
 
-  Font font = LoadFontEx("vendor/fonts/Inter.ttf", TEXT_SZ, null, 0);
+  Font font = LoadFontFromMemory(".ttf", FONT_DATA.ptr, cast(int)FONT_DATA.length, TEXT_SZ, null, 0);
   GuiSetFont(font);
+  Image icon = LoadImageFromMemory(".png", ICON_DATA.ptr, cast(int)ICON_DATA.length);
+  SetWindowIcon(icon);
   setDarkTheme();
 
   scope(exit) closeWindow();

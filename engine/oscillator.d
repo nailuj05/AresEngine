@@ -18,12 +18,14 @@ class Oscillator : Component {
   
   override void onUpdate(float dt) {
     t += dt;
-    switch (axis) {
-      case Axis.X: owner.transform.position.x = sin(frequency * t) * amplitude; break;
-      case Axis.Y: owner.transform.position.y = sin(frequency * t) * amplitude; break;
-      case Axis.Z: owner.transform.position.z = sin(frequency * t) * amplitude; break; 
-      default: break;
+    float value = sin(frequency * t) * amplitude;
+    Vector3 pos = owner.transform.position;
+    final switch (axis) {
+        case Axis.X: pos.x = value; break;
+        case Axis.Y: pos.y = value; break;
+        case Axis.Z: pos.z = value; break;
     }
+    owner.transform.position = pos;
   }
 
   version(Editor) {

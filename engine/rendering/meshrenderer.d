@@ -7,7 +7,9 @@ import engine.core.component;
 class MeshRenderer : Component {
   mixin Named!"MeshRenderer";
   
-  Mesh mesh;
+  // TODO: make this proper
+  string meshPath;
+  @DontSerialize Mesh mesh;
   Colors color;
   
   string testString = "hi";
@@ -22,7 +24,9 @@ class MeshRenderer : Component {
   }
   
   override void onDraw() {
-    DrawModel(model, owner.transform.position, 1.0f, color); 
+    model.transform = owner.transform.worldMatrix();
+  
+    DrawModel(model, Vector3.zero, 1.0f, color); 
   }
 
   override void onDestroy() {

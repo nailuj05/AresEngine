@@ -3,8 +3,7 @@ module engine.scene.loader;
 import std.json;
 import std.stdio  : writeln;
 import std.file   : readText, write;
-import std.traits : FieldNameTuple, Unqual;
-import std.meta   : AliasSeq;
+import std.traits : FieldNameTuple, Unqual, hasUDA;
 
 import raylib : Vector3, Quaternion;
 
@@ -12,15 +11,6 @@ import engine.scene.scene;
 import engine.core.gameobject;
 import engine.core.component;
 import engine.core.transform;
-
-
-// known components
-
-import engine.renderer.meshrenderer;
-import engine.oscillator;
-alias KnownComponents = AliasSeq!(MeshRenderer, Oscillator);
-
-// TODO: @DontSerialize Field
 
 // public API
 
@@ -58,7 +48,7 @@ private JSONValue serializeFields(T)(T obj) {
   static foreach (field; FieldNameTuple!(Unqual!T)) {
     {
       enum prot = __traits(getProtection, __traits(getMember, Unqual!T, field));
-      static if (prot == "public") {
+      static if (prot == "public" && !hasUDA!(__traits(getMember, Unqual!T, field), DontSerialize)) {
         alias FT = typeof(__traits(getMember, obj, field));
         auto  v  = __traits(getMember, obj, field);
 
@@ -76,7 +66,7 @@ private void deserializeFields(T)(T obj, JSONValue fields) {
   static foreach (field; FieldNameTuple!(Unqual!T)) {
     {
       enum prot = __traits(getProtection, __traits(getMember, Unqual!T, field));
-      static if (prot == "public") {
+      static if (prot == "public" && !hasUDA!(__traits(getMember, Unqual!T, field), DontSerialize)) {
         alias FT = typeof(__traits(getMember, obj, field));
         if (auto p = field in fields.object) {
           auto jv = *p;
@@ -96,10 +86,10 @@ private void deserializeFields(T)(T obj, JSONValue fields) {
     static foreach (T; KnownComponents) {
       if (auto t = cast(T)c) {
         return JSONValue([
-                          "type":    JSONValue(T.typeName),
-                          "enabled": JSONValue(c.enabled),
-                          "fields":  serializeFields(t),
-                          ]);
+          "type":    JSONValue(T.typeName),
+          "enabled": JSONValue(c.enabled),
+          "fields":  serializeFields(t),
+        ]);
       }
     }
 

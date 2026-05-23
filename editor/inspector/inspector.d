@@ -1,31 +1,59 @@
 module editor.inspector.inspector;
 
-import std.stdio;
-
-import raygui;
 import raylib;
+import raygui;
 
 import engine.core.gameobject;
 
 import editor.style;
+import editor.inspector.drawer;
 
-// Use proper constants for styling and spacing
+import std.string : toStringz;
+
 void drawInspector(Rectangle r, GameObject selected) {
-  import std.string : toStringz;
-
   DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
   GuiPanel(r, "Inspector");
-
   if (selected is null) return;
-  GuiLabel(Rectangle(r.x + 4, r.y + 32, r.width - 8, 20), selected.name.toStringz);
 
-  ulong a = cast(ulong)r.y + 64;
+  float x = r.x;
+  float y = r.y + 32;
+  float w = r.width;
+
+  drawField("Name", selected.name, selected.nameFS, x, y, w);
+  y += ROW_H;
+
+  GuiLine(Rectangle(x, y, w, 1), null);
+  y += 8;
+
+  GuiLabel(Rectangle(x + 8, y, w, FIELD_H), "Transform");
+  y += ROW_H;
+
+  Vector3 pos = selected.transform.localPosition;
+  if (drawVec3Field ("Position", pos, selected.posFS, x, y, w))
+    selected.transform.localPosition = pos;
+  y += ROW_H;
+
+  Quaternion rot = selected.transform.localRotation;
+  if (drawEulerField("Rotation", rot, selected.rotFS, x, y, w))
+    selected.transform.localRotation = rot;
+  y += ROW_H;
+
+  Vector3 scl = selected.transform.localScale;
+  if (drawVec3Field ("Scale", scl, selected.scaleFS, x, y, w))
+    selected.transform.localScale = scl;
+  y += ROW_H;
+
   foreach (component; selected.components) {
-    GuiLabel(Rectangle(r.x + 12, a, r.width - 8, 20), component.name.toStringz);
-    a = component.drawInspector(cast(ulong)r.x, cast(ulong)(a + 32), cast(ulong)r.width);
+    GuiLine(Rectangle(x, y, w, 1), null);
+    y += 8;
+    GuiLabel(Rectangle(x + 8, y, w - 8, FIELD_H), component.name.toStringz);
+    y += ROW_H;
+    y = cast(float)component.drawInspector(cast(ulong)x, cast(ulong)y, cast(ulong)w);
   }
 
-  if (GuiButton(Rectangle(r.x + 12, a, r.width - 20, 20), "Add Component")) {
-    
+  GuiLine(Rectangle(x, y, w, 1), null);
+  y += 8;
+  if (GuiButton(Rectangle(x + 12, y, w - 20, FIELD_H), "Add Component")) {
+    // TODO
   }
 }

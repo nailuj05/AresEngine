@@ -1,126 +1,160 @@
 module editor.inspector.drawer;
 
-import std.array;
-import std.format: format;
-import std.string: toStringz;
-
-import raygui;
 import raylib;
+import raygui;
 
-import editor.inspector.inspector;
+import std.format  : format;
+import std.string  : join, toStringz, fromStringz;
+import std.conv    : to;
+import std.traits  : hasUDA;
+
+import engine.core.component;
 
 enum MAX_FIELD_BUFFER = 256;
+enum float LABEL_W    = 120;
+enum float FIELD_H    = 20;
+enum float ROW_H      = 28;
+enum float AW         = 10; // axis letter width
 
 struct FieldState {
-  char[MAX_FIELD_BUFFER] buffer;
-  bool initialized;
+  char[MAX_FIELD_BUFFER] buffer = 0;
   bool editing;
 }
 
-ulong drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy, ulong panelWidth) {
-  ulong row = 0;
-  void delegate() deferredDropdown = null;
-  foreach (i, ref field; obj.tupleof) {
-    static if (__traits(getProtection, obj.tupleof[i]) == "public") {
-      enum name = __traits(identifier, obj.tupleof[i]);
-
-      if (name !in states) {
-        FieldState s;
-        initFieldState(s, field);
-        states[name] = s;
-      }
-      
-      drawField(name, field, states[name], ox, oy + row * 32, panelWidth, &deferredDropdown);
-      row++;
-    }
-  }
-  if (deferredDropdown) deferredDropdown();
-  return row * 32 + oy;
-}
-
-void initFieldState(T)(ref FieldState state, ref T value) {
-  if (state.initialized)
-    return;
-  static if (is(T == string)) {
-    auto len = value.length < MAX_FIELD_BUFFER - 1
-      ? value.length : MAX_FIELD_BUFFER - 1;
-    state.buffer[0 .. len] = value[0 .. len];
-    state.buffer[len] = '\0';
-  } else {
+private void syncBuffer(T)(ref FieldState s, T value) {
+  if (s.editing) return;
+  static if (is(T == float))
+    auto txt = format!"%.3f"(value);
+  else
     auto txt = format!"%s"(value);
-    auto len = txt.length < MAX_FIELD_BUFFER - 1
-      ? txt.length : MAX_FIELD_BUFFER - 1;
-    state.buffer[0 .. len] = txt[0 .. len];
-    state.buffer[len] = '\0';
-  }
-  state.initialized = true;
+  size_t len = txt.length < MAX_FIELD_BUFFER - 1 ? txt.length : MAX_FIELD_BUFFER - 1;
+  s.buffer[0 .. len] = txt[0 .. len];
+  s.buffer[len] = '\0';
 }
 
-void drawField(T)(string name, ref T value, ref FieldState state, ulong ox, ulong oy, ulong panelWidth, void delegate()* deferred = null) {
-  import std.format : format;
-  import std.string : toStringz, fromStringz;
-  import std.conv : to;
+private bool textBoxRow(ref FieldState s, Rectangle r) {
+  if (GuiTextBox(r, s.buffer.ptr, MAX_FIELD_BUFFER, s.editing)) {
+    s.editing = !s.editing;
+    return !s.editing; // true = just committed
+  }
+  return false;
+}
 
-  enum LABEL_W = 120;
-  enum FIELD_H = 20;
-  ox += 24;
+private bool drawVec3Row(string label, ref float x, ref float y, ref float z, ref FieldState[3] fs, float ox, float oy, float pw) {
+  syncBuffer(fs[0], x);
+  syncBuffer(fs[1], y);
+  syncBuffer(fs[2], z);
 
-  Rectangle labelRect = Rectangle(ox, oy, LABEL_W, FIELD_H);
-  Rectangle fieldRect = Rectangle(ox + LABEL_W + 4, oy, panelWidth - LABEL_W - 12 - 24, FIELD_H);
+  float fw = (pw - LABEL_W - 28) / 3.0f;
+  float cx = ox + 8 + LABEL_W + 4;
+  bool changed = false;
 
-  GuiLabel(labelRect, name.toStringz);
+  GuiLabel(Rectangle(ox + 8, oy, LABEL_W, FIELD_H), label.toStringz);
+
+  foreach (i, ref axis; ["X", "Y", "Z"]) {
+    if (textBoxRow(fs[i], Rectangle(cx, oy, fw, FIELD_H))) {
+      changed = true;
+      float* targets = [&x, &y, &z][i];
+      try { *targets = to!float(fromStringz(fs[i].buffer.ptr)); } catch (Exception) {}
+    }
+    cx += fw + 4;
+  }
+  return changed;
+}
+
+bool drawVec3Field(string label, ref Vector3 v, ref FieldState[3] fs, float ox, float oy, float pw) {
+  return drawVec3Row(label, v.x, v.y, v.z, fs, ox, oy, pw);
+}
+
+bool drawEulerField(string label, ref Quaternion q, ref FieldState[3] fs, float ox, float oy, float pw) {
+  // Sync from quaternion every frame when idle
+  if (!fs[0].editing && !fs[1].editing && !fs[2].editing) {
+    Vector3 e = QuaternionToEuler(q);
+    syncBuffer(fs[0], e.x * RAD2DEG);
+    syncBuffer(fs[1], e.y * RAD2DEG);
+    syncBuffer(fs[2], e.z * RAD2DEG);
+  }
+
+  float fw = (pw - LABEL_W - 28) / 3.0f;
+  float cx = ox + 8 + LABEL_W + 4;
+  bool changed = false;
+
+  GuiLabel(Rectangle(ox + 8, oy, LABEL_W, FIELD_H), label.toStringz);
+
+  foreach (i; 0 .. 3) {
+    static immutable string[3] axes = ["X", "Y", "Z"];
+    if (textBoxRow(fs[i], Rectangle(cx, oy, fw, FIELD_H)))
+      changed = true;
+    cx += fw + 4;
+  }
+
+  if (changed) {
+    try {
+      float ex = to!float(fromStringz(fs[0].buffer.ptr)) * DEG2RAD;
+      float ey = to!float(fromStringz(fs[1].buffer.ptr)) * DEG2RAD;
+      float ez = to!float(fromStringz(fs[2].buffer.ptr)) * DEG2RAD;
+      q = QuaternionFromEuler(ex, ey, ez);
+    } catch (Exception) {}
+  }
+  return true;
+}
+
+void drawField(T)(string label, ref T value, ref FieldState state, float ox, float oy, float pw, void delegate()* deferred = null) {
+  syncBuffer(state, value);
+  Rectangle lr = Rectangle(ox + 8, oy, LABEL_W, FIELD_H);
+  Rectangle fr = Rectangle(ox + 8 + LABEL_W + 4, oy, pw - LABEL_W - 20, FIELD_H);
+  GuiLabel(lr, label.toStringz);
 
   static if (is(T == bool)) {
-    // bool gets a small rectangle for the checkbox
-    Rectangle boolRect = Rectangle(ox + LABEL_W + 4, oy, FIELD_H, FIELD_H);
-    GuiCheckBox(boolRect, "".toStringz, &value);
+    GuiCheckBox(Rectangle(fr.x, oy, FIELD_H, FIELD_H), "".toStringz, &value);
   }
-  else static if (is(T == int)) {
-    if (GuiTextBox(fieldRect, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
-      state.editing = !state.editing;
-    if (!state.editing) {  // only parse when user finishes editing
-      try { value = to!int(fromStringz(state.buffer.ptr)); }
-      catch (Exception) {}
-    }
-  }
-  else static if (is(T == float)) {
-    if (GuiTextBox(fieldRect, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
+  else static if (is(T == float) || is(T == int)) {
+    if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
     if (!state.editing) {
-      try { value = to!float(fromStringz(state.buffer.ptr)); }
-      catch (Exception) {}
+      try {
+        static if (is(T == float)) value = to!float(fromStringz(state.buffer.ptr));
+        else                        value = to!int(fromStringz(state.buffer.ptr));
+      } catch (Exception) {}
     }
   }
   else static if (is(T == string)) {
-    if (GuiTextBox(fieldRect, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
+    if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
   }
   else static if (is(T == enum)) {
     import std.traits : EnumMembers;
-
-    // build "X;Y;Z" at compile time
-    enum optionStr = [__traits(allMembers, T)].join(";");
-
+    enum opts = [__traits(allMembers, T)].join(";");
     int active = 0;
-    static foreach (i, member; EnumMembers!T)
-      if (value == member) active = cast(int) i;
-
+    static foreach (i, m; EnumMembers!T)
+      if (value == m) active = cast(int)i;
     if (state.editing && deferred) {
-      // defer the open dropdown to after all fields are drawn (will still overlap in certain situations, design components to avoid it)
       *deferred = () {
-        if (GuiDropdownBox(fieldRect, optionStr.ptr, &active, true))
+        if (GuiDropdownBox(fr, opts.ptr, &active, true))
           state.editing = false;
-        static foreach (i, member; EnumMembers!T)
-          if (active == cast(int) i) value = member;
+        static foreach (i, m; EnumMembers!T)
+          if (active == cast(int)i) value = m;
       };
     } else {
-      if (GuiDropdownBox(fieldRect, optionStr.ptr, &active, false))
+      if (GuiDropdownBox(fr, opts.ptr, &active, false))
         state.editing = true;
     }
   }
-  // else {
-  //   GuiLabel(fieldRect, format!"%s"(value).toStringz);
-  // }
+}
+
+ulong drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy, ulong pw) {
+  float y = cast(float)oy;
+  void delegate() deferred = null;
+  foreach (i, ref field; obj.tupleof) {
+    static if (__traits(getProtection, obj.tupleof[i]) == "public" && !hasUDA!(obj.tupleof[i], DontSerialize)) {
+      enum name = __traits(identifier, obj.tupleof[i]);
+      if (name !in states) states[name] = FieldState.init;
+      drawField(name, field, states[name], cast(float)ox, y, cast(float)pw, &deferred);
+      y += ROW_H;
+    }
+  }
+  if (deferred) deferred();
+  return cast(ulong)y;
 }

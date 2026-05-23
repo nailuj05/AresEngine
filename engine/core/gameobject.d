@@ -12,6 +12,14 @@ class GameObject {
 
   private bool started = false;
   
+  version(Editor) {
+    import editor.inspector.drawer;
+    FieldState    nameFS;
+    FieldState[3] posFS;
+    FieldState[3] rotFS;
+    FieldState[3] scaleFS;
+  }
+    
   T addComponent(T : Component)() {
     auto c  = new T();
     c.owner = this;

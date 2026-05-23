@@ -1,6 +1,16 @@
 module engine.core.component;
 
+import std.meta   : AliasSeq;
+
 import engine.core.gameobject;
+
+// known components, needed for serialization and add component
+import engine.renderer.meshrenderer : MeshRenderer;
+import engine.oscillator : Oscillator;
+alias KnownComponents = AliasSeq!(MeshRenderer, Oscillator);
+
+// @DontSerialize Field
+struct DontSerialize {}
 
 mixin template Named(string s)
 {

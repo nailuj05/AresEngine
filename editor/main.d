@@ -188,7 +188,7 @@ int main(string[] args) {
       ClearBackground(Colors.BLACK);
       if (activeMenu >= 0) GuiSetState(GuiState.STATE_DISABLED);
       drawHierarchy(hierarchy, activeScene, selected);
-      drawViewport(viewport, sceneTarget);
+      auto gizMode = drawViewport(viewport, sceneTarget);
       drawInspector(inspector, selected);
       drawFolder(folder);
       GuiSetState(GuiState.STATE_NORMAL);
@@ -206,6 +206,9 @@ int main(string[] args) {
       case 2: handleGameObject(action.item); break;
       default: break;
     }
+
+    // update gizmo state
+    gizmo.mode = cast(GizmoMode)gizMode;
   }
 
   // Save automatically on quit

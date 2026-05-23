@@ -1,16 +1,31 @@
 module editor.viewport.viewport;
 
+import std.string : toStringz;
+
 import raylib;
 import raygui;
 
 import editor.style;
 
-void drawViewport(Rectangle r, const RenderTexture2D rt) {
-  immutable Rectangle src  = Rectangle(0, 0, cast(float)rt.texture.width,
-                                       -cast(float)rt.texture.height);
+private string[] gizmoButtons = ["Move", "Rotate", "Scale"];
+private int selectedButton = 0;
+
+int drawViewport(Rectangle r, const RenderTexture2D rt) {
+  immutable Rectangle src  = Rectangle(0, 0, cast(float)rt.texture.width, -cast(float)rt.texture.height);
   immutable Rectangle dest = Rectangle(r.x, r.y + TEXT_SZ + 2, r.width, r.height - TEXT_SZ - 2);
   GuiPanel(r, "Viewport");
   DrawTexturePro(rt.texture, src, dest, Vector2(0, 0), 0.0f, Colors.WHITE);
+
+  // Draw overlay icons for gizmo
+  float ox = r.x + 20;
+  float oy = r.y + 40;
+  foreach (i, txt; gizmoButtons) {
+    if (selectedButton == i) GuiSetState(GuiState.STATE_PRESSED);
+    if (GuiButton(Rectangle(ox + i * 65, oy, 65, 25), txt.toStringz))
+      selectedButton = cast(int)i;
+    GuiSetState(GuiState.STATE_NORMAL);
+  }
+  return selectedButton;
 }
 
 Ray getViewportRay(Vector2 mouse, Rectangle vp, Camera3D cam) {

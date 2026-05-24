@@ -61,48 +61,48 @@ void log(T...)(T args) {
 }
 
 int main(string[] args) {
-  // getopt
-  string path;
-  bool help, test, profile, newp;
-  getopt(args, "help|h", &help, "new|n", &newp, "profile|p", &profile, "test|d", &test);
+  bool help, newp, profile;
+  getopt(args, "help|h", &help, "new|n", &newp, "profile|p", &profile);
 
   if (help) {
-    log("usage: editor [--new] [--profile] [--test] <path>");
+    log("usage: editor [--new] [--profile] <path>");
     return 0;
   }
 
   if (newp) {
-    projectPath = getcwd();
-    projectManifest.projectName = "New Project";
+    if (args.length < 2) {
+      log("error: missing path");
+      return 1;
+    }
+    projectPath = args[1];
+    projectManifest.projectName    = "New Project";
     projectManifest.projectVersion = VERSION;
-
     activeScene = new Scene("main");
+
     string mainPath = projectPath ~ "/main.json";
     saveScene(activeScene, mainPath);
-
     projectManifest.projectScenes["main"] = mainPath;
     saveManifest();
-    log("Created new project in", projectPath);
-  }
-  else if (!test) {
+    log("Created new project in ", projectPath);
+  } else {
     if (args.length < 2) {
       log("error: missing project path");
       return 1;
     }
-    path = args[1];
 
-    if (!isDir(path)) {
-      log("Error with project path: ", path);
-    }
-    
-    Manifest loadedManifest;
-    string manifestPath = path ~ "/manifest.json";
-    
-    if (!exists(manifestPath)) {
-      log("Manifest file not found in ", path);
+    string manifestPath = args[1] ~ "/manifest.json";
+
+    if (!isDir(args[1])) {
+      log("Error with project path: ", args[1]);
       return 1;
     }
 
+    if (!exists(manifestPath)) {
+      log("Manifest file not found in ", args[1]);
+      return 1;
+    }
+
+    Manifest loadedManifest;
     try {
       loadedManifest = Manifest(readText(manifestPath));
     } catch (Exception e) {
@@ -117,14 +117,13 @@ int main(string[] args) {
     }
 
     log("Opening project ", loadedManifest.projectName);
-    projectPath     = path;
+    projectPath     = args[1];
     projectManifest = loadedManifest;
   }
 
-  // Init Editor
   SetTraceLogLevel(TraceLogLevel.LOG_WARNING);
   initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", -1));
-  // SetExitKey(KeyboardKey.KEY_NULL);
+  scope(exit) closeWindow();
 
   Font font = LoadFontFromMemory(".ttf", FONT_DATA.ptr, cast(int)FONT_DATA.length, TEXT_SZ, null, 0);
   GuiSetFont(font);
@@ -132,8 +131,6 @@ int main(string[] args) {
   SetWindowIcon(icon);
   setDarkTheme();
 
-  scope(exit) closeWindow();
-  
   Rectangle topBar, hierarchy, viewport, inspector, folder;
   computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
 
@@ -142,52 +139,28 @@ int main(string[] args) {
 
   editorCam = createEditorCamera();
 
-  // This is only for testing and quick iteration so I don't have to open a real project every time. will be removed in the future
-  if (test) {
-    // test project
-    projectManifest.projectName = "test";
-    projectManifest.projectVersion = VERSION;
-    
-    // test scene
-    activeScene = new Scene("untitled");
-    auto camera = activeScene.createObject("Camera");
-    camera.addComponent!Camera();
-    
-    auto player = activeScene.createObject("Player");
-    auto oscill = player.addComponent!Oscillator();
-    auto mesh   = player.addComponent!MeshRenderer();
-    mesh.mesh   = GenMeshCube(1.0f, 1.0f, 1.0f);
-    mesh.color  = Colors.RED;
-  } else {
-    string mainScene = projectManifest.projectScenes["main"];
-    if (mainScene == "") {
-      log("Project has no main scene");
-      return 1;
-    }
-    
-    activeScene = loadScene(mainScene);
+  string mainScene = projectManifest.projectScenes["main"];
+  if (mainScene == "") {
+    log("Project has no main scene");
+    return 1;
   }
-  
+  activeScene = loadScene(mainScene);
   activeScene.start();
 
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();
-    activeScene.update(dt);
 
     computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
 
-    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active && !gizmo.dragging) // camera should not move when file dialog is open
+    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active && !gizmo.dragging)
       updateEditorCamera(editorCam, viewport);
 
-    // resize viewport rt if viewport size changed
     if (viewport.width != sceneTarget.texture.width || viewport.height != sceneTarget.texture.height)
       resizeSceneTarget(sceneTarget, cast(int)viewport.width, cast(int)viewport.height);
- 
+
     if (selected !is null)
       updateGizmo(gizmo, viewport, editorCam, selected);
-    
-    // TODO: obviously dont update the game while in editor, this is only for testing
-    activeScene.update(dt);
+
     renderScene(activeScene);
 
     BeginDrawing();
@@ -199,14 +172,12 @@ int main(string[] args) {
       drawFolder(folder);
       GuiSetState(GuiState.STATE_NORMAL);
       auto action = drawTopBar(topBar, activeScene.name);
-
       drawSettingsDialog(settingsDialog);
       drawFileDialog(fileDialog);
       drawColorPickerDialog();
       if (profile) DrawFPS(GetScreenWidth() - 100, 2);
     EndDrawing();
 
-    // handle action from topbar
     switch (action.menu) {
       case 0: handleProject(action.item);    break;
       case 1: handleScene(action.item);      break;
@@ -214,17 +185,15 @@ int main(string[] args) {
       default: break;
     }
 
-    // update gizmo state
-    gizmo.mode = cast(GizmoMode)selection.gizmo;
+    if (action.play) handlePlay();
+
+    gizmo.mode  = cast(GizmoMode)selection.gizmo;
     gizmo.space = cast(GizmoSpace)selection.space;
   }
 
-  // Save automatically on quit
-  if (!test) {
-   saveScene(activeScene, activeScene.name ~ ".json");
-   saveManifest();
-  }
-  
+  saveScene(activeScene, activeScene.name ~ ".json");
+  saveManifest();
+
   return 0;
 }
 
@@ -314,6 +283,15 @@ void handleGameObject(int item) {
   switch (item) {
   default: break;
   }
+}
+
+void handlePlay() {
+  import std.process : spawnProcess;
+  import std.file    : readLink;
+  import std.path    : dirName, buildPath;
+
+  saveScene(activeScene, activeScene.name ~ ".json");
+  spawnProcess(["ares-runtime", "--scene", activeScene.name ~ ".json"]);
 }
 
 // Project Functions

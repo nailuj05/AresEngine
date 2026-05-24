@@ -1,6 +1,10 @@
 module engine.core.window;
 
+import std.string : toStringz;
+
 import raylib;
+
+import engine.manifest;
 
 struct WindowConfig {
     int    width     = 1280;
@@ -10,14 +14,22 @@ struct WindowConfig {
 }
 
 void initWindow(WindowConfig cfg) {
-    InitWindow(cfg.width, cfg.height, cfg.title.ptr);
-    SetTargetFPS(cfg.targetFps);
+  InitWindow(cfg.width, cfg.height, cfg.title.toStringz());
+  SetTargetFPS(cfg.targetFps);
+}
+
+void initWindow(Manifest manifest) {
+  InitWindow(manifest.resolutionX, manifest.resolutionY, manifest.projectName.toStringz());
+  SetTargetFPS(manifest.targetFPS);
+
+  if (manifest.fullscreen)
+    ToggleFullscreen();
 }
 
 void closeWindow() {
-    CloseWindow();
+  CloseWindow();
 }
 
 bool shouldClose() {
-    return WindowShouldClose();
+  return WindowShouldClose();
 }

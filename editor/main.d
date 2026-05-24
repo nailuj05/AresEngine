@@ -2,7 +2,8 @@ module main;
 
 import std.getopt;
 import std.format : format;
-import std.file   : exists, isDir, readText, write, getcwd;
+import std.path   : absolutePath;
+import std.file   : chdir, exists, isDir, readText, write, getcwd;
 
 import raylib;
 import raygui;
@@ -69,57 +70,56 @@ int main(string[] args) {
     return 0;
   }
 
-  if (newp) {
-    if (args.length < 2) {
-      log("error: missing path");
-      return 1;
-    }
-    projectPath = args[1];
-    projectManifest.projectName    = "New Project";
-    projectManifest.projectVersion = VERSION;
-    activeScene = new Scene("main");
+ if (newp) {
+   if (args.length < 2) {
+     log("error: missing path");
+     return 1;
+   }
+   projectPath = absolutePath(args[1]);
+   chdir(projectPath);
+   projectManifest.projectName    = "New Project";
+   projectManifest.projectVersion = VERSION;
+   activeScene = new Scene("main");
+   saveScene(activeScene, "main.json");
+   projectManifest.projectScenes["main"] = "main.json";
+   saveManifest();
+   log("Created new project in ", projectPath);
+ } else {
+   if (args.length < 2) {
+     log("error: missing project path");
+     return 1;
+   }
 
-    string mainPath = projectPath ~ "/main.json";
-    saveScene(activeScene, mainPath);
-    projectManifest.projectScenes["main"] = mainPath;
-    saveManifest();
-    log("Created new project in ", projectPath);
-  } else {
-    if (args.length < 2) {
-      log("error: missing project path");
-      return 1;
-    }
+   projectPath = absolutePath(args[1]);
 
-    string manifestPath = args[1] ~ "/manifest.json";
+   if (!isDir(projectPath)) {
+     log("Error with project path: ", projectPath);
+     return 1;
+   }
 
-    if (!isDir(args[1])) {
-      log("Error with project path: ", args[1]);
-      return 1;
-    }
+   if (!exists(projectPath ~ "/manifest.json")) {
+     log("Manifest file not found in ", projectPath);
+     return 1;
+   }
 
-    if (!exists(manifestPath)) {
-      log("Manifest file not found in ", args[1]);
-      return 1;
-    }
+   Manifest loadedManifest;
+   try {
+     loadedManifest = Manifest(readText(projectPath ~ "/manifest.json"));
+   } catch (Exception e) {
+     log("Error parsing manifest file ", projectPath ~ "/manifest.json", "\n", e.toString());
+     return 1;
+   }
 
-    Manifest loadedManifest;
-    try {
-      loadedManifest = Manifest(readText(manifestPath));
-    } catch (Exception e) {
-      log("Error parsing manifest file ", manifestPath, "\n", e.toString());
-      return 1;
-    }
+   if (compareVersion(loadedManifest.projectVersion, VERSION) > 0) {
+     log(format("Project version (%s) is newer than editor version (%s)",
+                loadedManifest.projectVersion, VERSION));
+     return 1;
+   }
 
-    if (compareVersion(loadedManifest.projectVersion, VERSION) > 0) {
-      log(format("Project version (%s) is newer than editor version (%s)",
-                 loadedManifest.projectVersion, VERSION));
-      return 1;
-    }
-
-    log("Opening project ", loadedManifest.projectName);
-    projectPath     = args[1];
-    projectManifest = loadedManifest;
-  }
+   log("Opening project ", loadedManifest.projectName, " at ", projectPath);
+   projectManifest = loadedManifest;
+   chdir(projectPath);
+ }
 
   SetTraceLogLevel(TraceLogLevel.LOG_WARNING);
   initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", -1));
@@ -273,7 +273,7 @@ void handleScene(int item) {
   switch (item) {
     case 0: /*New    */ break; // TODO: New Scene
     case 1: /*Open   */ fileDialog.show(FileDialogMode.Open, "", ".json"); break; 
-    case 2: /*Save   */ saveScene(activeScene, activeScene.name ~ ".json"); break; 
+    case 2: /*Save   */ saveScene(activeScene, projectPath ~ "/" ~ activeScene.name ~ ".json"); break; 
     case 3: /*Save As*/ fileDialog.show(FileDialogMode.Save, "", ".json"); break; 
   default: break;
   }
@@ -281,21 +281,20 @@ void handleScene(int item) {
 
 void handleGameObject(int item) {
   switch (item) {
+    case 0: /*Add Empty */ activeScene.createObject("Empty"); break;
+    case 1: /*Add Cube  */ activeScene.createObject("Cube").addComponent!MeshRenderer().onStart(); break;
+    case 2: /*Add Camera*/ activeScene.createObject("Camera").addComponent!Camera(); break;
   default: break;
   }
 }
 
 void handlePlay() {
   import std.process : spawnProcess;
-  import std.file    : readLink;
-  import std.path    : dirName, buildPath;
-
   saveScene(activeScene, activeScene.name ~ ".json");
   spawnProcess(["ares-runtime", "--scene", activeScene.name ~ ".json"]);
 }
 
 // Project Functions
 void saveManifest() {
-  string json = projectManifest.toString();
-  write(projectPath ~ "/manifest.json", json);
+  write("manifest.json", projectManifest.toString());
 }

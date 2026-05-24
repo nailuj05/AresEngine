@@ -1,30 +1,30 @@
 module editor.settingsdialog;
-
 import raylib;
 import raygui;
-
 import std.algorithm : clamp;
 import std.string    : fromStringz, toStringz;
-
 import engine.manifest;
 
-struct SettingsDialog {
+enum FIELD_H = 20;
 
+struct SettingsDialog {
   bool     active;
   bool     cancelled;
   Manifest result;
-
 private:
   Rectangle b;
   Vector2   pan;
   bool      drag;
-
-  int  activeTab;
-  bool nameEdit;
+  int       activeTab;
 
   char[256] nameBuf;
+  bool      nameEdit;
 
-  //  Internals 
+  int  resX, resY;
+  bool resXEdit, resYEdit;
+  bool fullscreen;
+  int fps;
+  bool fpsEdit;
 
   static void fillBuf(char[] buf, string s) nothrow {
     buf[] = '\0';
@@ -33,53 +33,81 @@ private:
   }
 
   void closeWith(bool cancel) {
-    if (!cancel)
+    if (!cancel) {
       result.projectName = fromStringz(nameBuf.ptr).idup;
+      result.resolutionX = resX;
+      result.resolutionY = resY;
+      result.fullscreen  = fullscreen;
+      result.targetFPS   = fps;
+    }
     cancelled = cancel;
     active    = false;
   }
 
   void drawGeneral(Rectangle area) {
-    float x = area.x + 8;
-    float y = area.y + 8;
-    float w = area.width - 16;
+    float x  = area.x + 8;
+    float w  = area.width - 16;
+    float oy = area.y + 8;
 
-    GuiLabel(Rectangle(x, y, 120, 24), "Project Name:");
-    if (GuiTextBox(Rectangle(x + 128, y, w - 128, 24),
-                   nameBuf.ptr, cast(int)nameBuf.length, nameEdit))
+    GuiLabel(Rectangle(x, oy, 120, 24), "Project Name:");
+    if (GuiTextBox(Rectangle(x + 128, oy, w - 128, 24), nameBuf.ptr, cast(int)nameBuf.length, nameEdit))
       nameEdit = !nameEdit;
+
+    oy += 24 + 8;
+
+    GuiLabel(Rectangle(x, oy, 120, FIELD_H), "Resolution X:");
+    if (GuiSpinner(Rectangle(x + 128, oy, 120, FIELD_H), "".toStringz, &resX, 1, 7680, resXEdit))
+      resXEdit = !resXEdit;
+
+    oy += FIELD_H + 8;
+
+    GuiLabel(Rectangle(x, oy, 120, FIELD_H), "Resolution Y:");
+    if (GuiSpinner(Rectangle(x + 128, oy, 120, FIELD_H), "".toStringz, &resY, 1, 4320, resYEdit))
+      resYEdit = !resYEdit;
+
+    oy += FIELD_H + 8;
+
+    GuiLabel(Rectangle(x, oy, 120, FIELD_H), "Fullscreen:");
+    GuiCheckBox(Rectangle(x + 128, oy, FIELD_H, FIELD_H), "".toStringz, &fullscreen);
+
+    oy += FIELD_H + 8;
+
+    GuiLabel(Rectangle(x, oy, 120, FIELD_H), "Target FPS:");
+    if (GuiSpinner(Rectangle(x + 128, oy, 120, FIELD_H), "".toStringz, &fps, -1, 999, fpsEdit))
+      fpsEdit = !fpsEdit;
   }
 
-  //  Public API 
 public:
-
-  /// Snapshot `m` into the dialog and open it.
   void show(Manifest m) {
     result    = m;
     active    = true;
     cancelled = false;
     activeTab = 0;
-    nameEdit  = false;
     drag      = false;
+
+    nameEdit  = false;
+    fillBuf(nameBuf[], m.projectName);
+
+    resX       = m.resolutionX;
+    resY       = m.resolutionY;
+    fullscreen = m.fullscreen;
+    fps        = m.targetFPS;
+    resXEdit   = false;
+    resYEdit   = false;
+    fpsEdit    = false;
 
     b = Rectangle(
       GetScreenWidth()  / 2.0f - 380.0f,
       GetScreenHeight() / 2.0f - 280.0f,
       740.0f, 540.0f
     );
-
-    fillBuf(nameBuf[], m.projectName);
   }
 
-  /// Draw the dialog. Call every frame while `active` is true.
-  /// Returns: true the frame the dialog closes.
   bool draw() {
     if (!active) return false;
 
-    //  Drag 
     Vector2   mouse    = GetMousePosition();
     Rectangle titleBar = Rectangle(b.x, b.y, b.width, 24);
-
     if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) &&
         CheckCollisionPointRec(mouse, titleBar)) {
       drag = true;
@@ -91,35 +119,27 @@ public:
       if (IsMouseButtonReleased(MouseButton.MOUSE_BUTTON_LEFT)) drag = false;
     }
 
-    //  Window box 
     if (GuiWindowBox(b, "#154# Project Settings")) {
       closeWith(true);
       return true;
     }
 
-    //  Tab bar
     const(char)*[1] tabs = ["General".toStringz];
     GuiTabBar(
       Rectangle(b.x + 8, b.y + 32, b.width - 16, 24),
       tabs.ptr, cast(int)tabs.length, &activeTab
     );
 
-    //  Tab content 
     Rectangle content = Rectangle(b.x + 8, b.y + 64, b.width - 16, b.height - 64 - 44);
     GuiGroupBox(content, null);
-
     switch (activeTab) {
       default:
       case 0: drawGeneral(content); break;
-      // case 1: drawPhysics(content);   break;
-      // case 2: drawRendering(content); break;
     }
 
-    //  Bottom buttons 
     float bot = b.y + b.height;
     float bx  = b.x;
     float bw  = b.width;
-
     if (GuiButton(Rectangle(bx + bw - 104, bot - 36, 96, 28), "Apply")) {
       closeWith(false);
       return true;
@@ -128,7 +148,6 @@ public:
       closeWith(true);
       return true;
     }
-
     return false;
   }
 }

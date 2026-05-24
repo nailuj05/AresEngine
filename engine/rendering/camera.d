@@ -16,14 +16,17 @@ class Camera : Component {
   private Vector3 forward;
 
   override void onStart() {
-    rcamera = Camera3D();
+    rcamera.up         = Vector3(0, 1, 0);
+    rcamera.projection = projection;
     rlSetClipPlanes(nearPlane, farPlane);
   }
-  
+
   override void onUpdate(float dt) {
-    rcamera.position = owner.transform.position;
-    rcamera.fovy = fieldOfView;
-    rcamera.target = owner.transform.position + owner.transform.forward;
+    rcamera.position   = owner.transform.position;
+    rcamera.fovy       = fieldOfView;
+    rcamera.up         = Vector3(0, 1, 0);
+    rcamera.projection = projection;
+    rcamera.target     = owner.transform.position + owner.transform.forward;
   }
 
   override void onDraw() {

@@ -39,9 +39,9 @@ immutable MenuDef[] MENUS = [
   ]),
   MenuDef("GameObject", [
     MenuItem("Add Empty"),
-    MenuItem("Add Plane"),
     MenuItem("Add Cube"),
-    MenuItem("Scene Settings"),
+    MenuItem("Add Camera"),
+    // MenuItem("Scene Settings"),
   ]),
 ];
 
@@ -80,7 +80,7 @@ MenuAction drawTopBar(Rectangle r, string sceneName) {
   }
 
   Rectangle playRect = Rectangle(
-    btnRects[MENUS.length - 1].x + BUTTON_W + BUTTON_PAD,
+    btnRects[MENUS.length - 1].x + BUTTON_W + BUTTON_PAD + 10,
     r.y + BUTTON_PAD,
     PLAY_W,
     r.height - BUTTON_PAD * 2

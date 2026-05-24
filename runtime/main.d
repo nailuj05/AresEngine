@@ -58,7 +58,7 @@ int main(string[] args) {
 
   SetTraceLogLevel(TraceLogLevel.LOG_WARNING);
   SetConfigFlags(ConfigFlags.FLAG_MSAA_4X_HINT);
-  initWindow(WindowConfig(1920, 1080, manifest.projectName, -1));
+  initWindow(manifest);
   SetExitKey(KeyboardKey.KEY_NULL);
   scope(exit) CloseWindow();
 
@@ -69,6 +69,11 @@ int main(string[] args) {
   activeScene.start();
   mainCamera = activeScene.getMainCamera();
 
+  if (mainCamera is null) {
+    log("main camera is null");
+    return 1;
+  }
+
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();
     activeScene.update(dt);
@@ -78,6 +83,7 @@ int main(string[] args) {
       BeginMode3D(mainCamera.rcamera);
         activeScene.draw();
       EndMode3D();
+      DrawFPS(10, 10);
     EndDrawing();
   }
 

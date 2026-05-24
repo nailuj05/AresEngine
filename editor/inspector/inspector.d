@@ -1,14 +1,26 @@
 module editor.inspector.inspector;
 
+import std.string : toStringz;
+
 import raylib;
 import raygui;
 
 import engine.core.gameobject;
+import engine.core.component;
 
 import editor.style;
 import editor.inspector.drawer;
 
-import std.string : toStringz;
+
+static int  addCompActive = 0;
+static bool addCompOpen   = false;
+
+static immutable string[] COMPONENT_NAMES = () {
+  string[] names;
+  foreach (C; KnownComponents)
+    names ~= __traits(identifier, C);
+  return names;
+}();
 
 void drawInspector(Rectangle r, GameObject selected) {
   DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
@@ -53,7 +65,25 @@ void drawInspector(Rectangle r, GameObject selected) {
 
   GuiLine(Rectangle(x, y, w, 1), null);
   y += 8;
-  if (GuiButton(Rectangle(x + 12, y, w - 20, FIELD_H), "Add Component")) {
-    // TODO
+
+  // Add Component
+  if (GuiButton(Rectangle(x + 12, y, w - 20, FIELD_H), "Add Component"))
+    addCompOpen = !addCompOpen;
+
+  if (addCompOpen && selected !is null) {
+    Rectangle dropRect = Rectangle(x + 12, y + FIELD_H, w - 20, FIELD_H * COMPONENT_NAMES.length);
+    DrawRectangleRec(dropRect, GetColor(PANEL_BG));
+    DrawRectangleLinesEx(dropRect, 1, Fade(Colors.BLACK, 0.45f));
+
+    foreach (i, C; KnownComponents) {
+      if (GuiButton(Rectangle(x + 12, y + FIELD_H * (i + 1), w - 20, FIELD_H), COMPONENT_NAMES[i].toStringz)) {
+        selected.addComponent!C();
+        addCompOpen = false;
+      }
+    }
+
+    if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) &&
+        !CheckCollisionPointRec(GetMousePosition(), dropRect))
+      addCompOpen = false;
   }
 }

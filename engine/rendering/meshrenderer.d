@@ -20,6 +20,7 @@ class MeshRenderer : Component {
   private Model model;
   
   override void onStart() {
+    mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
     model = LoadModelFromMesh(mesh);
   }
   

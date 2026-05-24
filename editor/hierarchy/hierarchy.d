@@ -1,5 +1,7 @@
 module editor.hierarchy.hierarchy;
 
+import std.string : toStringz;
+
 import raylib;
 import raygui;
 
@@ -13,7 +15,7 @@ void drawHierarchy(Rectangle r, const Scene activeScene, ref GameObject selected
   GuiPanel(r, "Hierarchy");
   int y = cast(int)r.y + 28;
   foreach (go; activeScene.roots) {
-    if (GuiButton(Rectangle(r.x + 4, y, r.width - 8, 22), go.name.ptr))
+    if (GuiButton(Rectangle(r.x + 4, y, r.width - 8, 22), go.name.toStringz()))
       selected = cast(GameObject)go;
     y += 26;
   }

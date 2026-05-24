@@ -14,11 +14,22 @@ struct Manifest {
 
   string[string] projectScenes;
 
+  int resolutionX = 600;
+  int resolutionY = 400;
+
+  bool fullscreen = false; 
+
+  int targetFPS   = 60;
+
   this(string json) {
     JSONValue parsed = parseJSON(json);
 
     this.projectName    = parsed["name"].str;
     this.projectVersion = parsed["version"].str;
+    this.resolutionX    = cast(int)parsed["resX"].integer;
+    this.resolutionY    = cast(int)parsed["resY"].integer;
+    this.fullscreen     = parsed["fullscreen"].boolean;
+    this.targetFPS      = cast(int)parsed["targetFPS"].integer;
 
     foreach (k, v; parsed["scenes"].object)
         this.projectScenes[k] = v.str;
@@ -26,9 +37,13 @@ struct Manifest {
 
   string toString() {
     JSONValue j = [
-      "name":    JSONValue(projectName),
-      "version": JSONValue(projectVersion),
-      "scenes":  JSONValue(projectScenes)
+      "name":       JSONValue(projectName),
+      "version":    JSONValue(projectVersion),
+      "scenes":     JSONValue(projectScenes),
+      "resX":       JSONValue(resolutionX),
+      "resY":       JSONValue(resolutionY),
+      "fullscreen": JSONValue(fullscreen),
+      "targetFPS":  JSONValue(targetFPS),
     ];
     return j.toPrettyString();
   }

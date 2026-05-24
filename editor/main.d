@@ -14,7 +14,8 @@ import engine.core.component;
 import engine.core.gameobject;
 import engine.scene.scene;
 import engine.scene.loader;
-import engine.renderer.meshrenderer;
+import engine.rendering.camera : Camera;
+import engine.rendering.meshrenderer;
 import engine.oscillator;
 
 import editor.style;
@@ -149,7 +150,9 @@ int main(string[] args) {
     
     // test scene
     activeScene = new Scene("untitled");
-    activeScene.createObject("Camera");
+    auto camera = activeScene.createObject("Camera");
+    camera.addComponent!Camera();
+    
     auto player = activeScene.createObject("Player");
     auto oscill = player.addComponent!Oscillator();
     auto mesh   = player.addComponent!MeshRenderer();
@@ -191,7 +194,7 @@ int main(string[] args) {
       ClearBackground(Colors.BLACK);
       if (activeMenu >= 0) GuiSetState(GuiState.STATE_DISABLED);
       drawHierarchy(hierarchy, activeScene, selected);
-      auto gizMode = drawViewport(viewport, sceneTarget);
+      auto selection = drawViewport(viewport, sceneTarget);
       drawInspector(inspector, selected);
       drawFolder(folder);
       GuiSetState(GuiState.STATE_NORMAL);
@@ -212,7 +215,8 @@ int main(string[] args) {
     }
 
     // update gizmo state
-    gizmo.mode = cast(GizmoMode)gizMode;
+    gizmo.mode = cast(GizmoMode)selection.gizmo;
+    gizmo.space = cast(GizmoSpace)selection.space;
   }
 
   // Save automatically on quit
@@ -231,8 +235,9 @@ void renderScene(Scene scene) {
     DrawGrid(20, 1.0f);
     scene.draw();
     if (selected !is null) {
-      drawGizmo(gizmo, selected.transform.position, editorCam);
+      drawGizmo(gizmo, selected.transform.position, selected.transform.rotation, editorCam);
     }
+    
   EndMode3D();
   EndTextureMode();
 }

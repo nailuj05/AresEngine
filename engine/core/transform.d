@@ -87,14 +87,27 @@ public:
       // even when the parent carries rotation or shear.
       auto parentScale = parent.scale;
       _localScale = Vector3(
-        ws.x / parentScale.x,
-        ws.y / parentScale.y,
-        ws.z / parentScale.z,
-      );
+                            ws.x / parentScale.x,
+                            ws.y / parentScale.y,
+                            ws.z / parentScale.z,
+                            );
     }
     markDirty();
   }
 
+  @property Vector3 forward() const {
+    return Vector3Normalize(Vector3RotateByQuaternion(Vector3(0, 0, 1), rotation));
+  }
+
+  @property Vector3 up() const {
+    return Vector3Normalize(Vector3RotateByQuaternion(Vector3(0, 1, 0), rotation));
+  }
+
+  @property Vector3 right() const {
+    return Vector3Normalize(Vector3RotateByQuaternion(Vector3(1, 0, 0), rotation));
+  }
+
+  
   Matrix localMatrix() {
     updateLocalMatrix();
     return _localMatrix;

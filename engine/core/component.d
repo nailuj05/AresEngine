@@ -5,9 +5,10 @@ import std.meta   : AliasSeq;
 import engine.core.gameobject;
 
 // known components, needed for serialization and add component
-import engine.renderer.meshrenderer : MeshRenderer;
+import engine.rendering.meshrenderer: MeshRenderer;
+import engine.rendering.camera : Camera;
 import engine.oscillator : Oscillator;
-alias KnownComponents = AliasSeq!(MeshRenderer, Oscillator);
+alias KnownComponents = AliasSeq!(MeshRenderer, Camera, Oscillator);
 
 // @DontSerialize Field
 struct DontSerialize {}

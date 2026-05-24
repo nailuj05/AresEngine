@@ -1,4 +1,4 @@
-module engine.renderer.meshrenderer;
+module engine.rendering.meshrenderer;
 
 import raylib;
 

@@ -125,9 +125,9 @@ public:
     nameEdit = false;
 
     b = Rectangle(
-      GetScreenWidth()  / 2.0f - 440.0f,
-      GetScreenHeight() / 2.0f - 320.0f,
-      880.0f, 640.0f
+      GetScreenWidth()  / 2.0f - 380.0f,
+      GetScreenHeight() / 2.0f - 280.0f,
+      740.0f, 540.0f
     );
     
 

@@ -63,9 +63,9 @@ public:
     drag      = false;
 
     b = Rectangle(
-      GetScreenWidth()  / 2.0f - 440.0f,
-      GetScreenHeight() / 2.0f - 320.0f,
-      880.0f, 640.0f
+      GetScreenWidth()  / 2.0f - 380.0f,
+      GetScreenHeight() / 2.0f - 280.0f,
+      740.0f, 540.0f
     );
 
     fillBuf(nameBuf[], m.projectName);
@@ -106,7 +106,7 @@ public:
 
     //  Tab content 
     Rectangle content = Rectangle(b.x + 8, b.y + 64, b.width - 16, b.height - 64 - 44);
-    GuiGroupBox(content, "");
+    GuiGroupBox(content, null);
 
     switch (activeTab) {
       default:

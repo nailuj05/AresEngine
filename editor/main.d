@@ -22,6 +22,7 @@ import editor.layout;
 import editor.topbar;
 import editor.filedialog;
 import editor.settingsdialog;
+import editor.colorpickerdialog;
 import editor.editorcamera;
 import editor.viewport.gizmos;
 import editor.viewport.viewport;
@@ -46,6 +47,8 @@ private Camera3D        editorCam;
 private GizmoState gizmo;
 private FileDialog fileDialog;
 private SettingsDialog settingsDialog;
+import editor.inspector.drawer : colorPicker; 
+
 private bool exitRequested;
 
 enum TOP_BAR_SIZE = 24;
@@ -170,7 +173,7 @@ int main(string[] args) {
 
     computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
 
-    if (!fileDialog.active && !settingsDialog.active && !gizmo.dragging) // camera should not move when file dialog is open
+    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active && !gizmo.dragging) // camera should not move when file dialog is open
       updateEditorCamera(editorCam, viewport);
 
     // resize viewport rt if viewport size changed
@@ -196,6 +199,7 @@ int main(string[] args) {
 
       drawSettingsDialog(settingsDialog);
       drawFileDialog(fileDialog);
+      drawColorPickerDialog();
       if (profile) DrawFPS(GetScreenWidth() - 100, 2);
     EndDrawing();
 
@@ -272,6 +276,12 @@ void drawSettingsDialog(ref SettingsDialog settingsDialog) {
         saveManifest();
       }
     }
+  }
+}
+
+void drawColorPickerDialog() {
+  if (colorPicker.active) {
+    colorPicker.draw();
   }
 }
       

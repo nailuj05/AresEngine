@@ -168,8 +168,8 @@ public:
 
     //  Window box 
     string title = (mode == FileDialogMode.Open)
-      ? "Open File"
-      : "Save File";
+      ? "#1# Open File"
+      : "#2# Save File";
 
     if (GuiWindowBox(b, title.toStringz)) {
       closeWith(true);

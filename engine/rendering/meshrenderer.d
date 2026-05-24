@@ -10,7 +10,7 @@ class MeshRenderer : Component {
   // TODO: make this proper
   string meshPath;
   @DontSerialize Mesh mesh;
-  Colors color;
+  Color color = Color(255, 0, 0);
   
   string testString = "hi";
   float testFloat = 67.6767f;

@@ -92,7 +92,7 @@ public:
     }
 
     //  Window box 
-    if (GuiWindowBox(b, "Project Settings")) {
+    if (GuiWindowBox(b, "#154# Project Settings")) {
       closeWith(true);
       return true;
     }

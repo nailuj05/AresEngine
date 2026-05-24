@@ -9,6 +9,9 @@ import std.conv    : to;
 import std.traits  : hasUDA;
 
 import engine.core.component;
+import editor.colorpickerdialog;
+
+ColorPickerDialog colorPicker;
 
 enum MAX_FIELD_BUFFER = 256;
 enum float LABEL_W    = 120;
@@ -123,6 +126,16 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
       state.editing = !state.editing;
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
+  }static if (is(T == Color)) {
+    DrawRectangleRec(fr, value);
+    DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
+
+    if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), fr))
+      colorPicker.show(value);
+
+    if (colorPicker.hasResult) {
+      value = colorPicker.result;
+    }
   }
   else static if (is(T == enum)) {
     import std.traits : EnumMembers;

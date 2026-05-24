@@ -8,9 +8,14 @@ import raygui;
 import editor.style;
 
 private string[] gizmoButtons = ["Move", "Rotate", "Scale"];
-private int selectedButton = 0;
+private int selectedGizmoButton = 0;
 
-int drawViewport(Rectangle r, const RenderTexture2D rt) {
+private string[] spaces = ["Global", "Local"];
+private int selectedSpace = 0;
+
+struct Selection { int gizmo, space; }
+
+Selection drawViewport(Rectangle r, const RenderTexture2D rt) {
   immutable Rectangle src  = Rectangle(0, 0, cast(float)rt.texture.width, -cast(float)rt.texture.height);
   immutable Rectangle dest = Rectangle(r.x, r.y + TEXT_SZ + 2, r.width, r.height - TEXT_SZ - 2);
   GuiPanel(r, "Viewport");
@@ -20,12 +25,17 @@ int drawViewport(Rectangle r, const RenderTexture2D rt) {
   float ox = r.x + 20;
   float oy = r.y + 40;
   foreach (i, txt; gizmoButtons) {
-    if (selectedButton == i) GuiSetState(GuiState.STATE_PRESSED);
+    if (selectedGizmoButton == i) GuiSetState(GuiState.STATE_PRESSED);
     if (GuiButton(Rectangle(ox + i * 65, oy, 65, 25), txt.toStringz))
-      selectedButton = cast(int)i;
+      selectedGizmoButton = cast(int)i;
     GuiSetState(GuiState.STATE_NORMAL);
   }
-  return selectedButton;
+
+  if (GuiButton(Rectangle(ox + 3 * 65 + 10, oy, 65, 25), spaces[selectedSpace].toStringz)) {
+    selectedSpace = (selectedSpace + 1) % 2;
+  }
+  
+  return Selection(selectedGizmoButton, selectedSpace);
 }
 
 Ray getViewportRay(Vector2 mouse, Rectangle vp, Camera3D cam) {

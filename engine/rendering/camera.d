@@ -9,18 +9,21 @@ class Camera : Component {
 
   CameraProjection projection = CameraProjection.CAMERA_PERSPECTIVE;
   float fieldOfView = 80.0f;
+  float nearPlane   = 0.1f;
+  float farPlane    = 1000.0f; 
   
-  private Camera3D camera; 
+  @DontSerialize Camera3D rcamera; 
   private Vector3 forward;
 
   override void onStart() {
-    camera = Camera3D();
+    rcamera = Camera3D();
+    rlSetClipPlanes(nearPlane, farPlane);
   }
   
   override void onUpdate(float dt) {
-    camera.position = owner.transform.position;
-    camera.fovy = fieldOfView;
-    camera.target = owner.transform.position + owner.transform.forward;
+    rcamera.position = owner.transform.position;
+    rcamera.fovy = fieldOfView;
+    rcamera.target = owner.transform.position + owner.transform.forward;
   }
 
   override void onDraw() {

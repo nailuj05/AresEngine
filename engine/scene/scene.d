@@ -1,7 +1,9 @@
 module engine.scene.scene;
 
 import std.algorithm.mutation : remove;
+
 import engine.core.gameobject;
+import engine.rendering.camera;
 
 class Scene {
   string       name;
@@ -44,5 +46,25 @@ class Scene {
       go.destroy();
 
     roots = [];
+  }
+
+  Camera getMainCamera() {
+    foreach (root; roots) {
+      Camera c = findMainCamera(root);
+      if (c !is null)
+        return c;
+    }
+    return null;
+  }
+
+  private Camera findMainCamera(GameObject go) {
+    Camera c = go.getComponent!Camera();
+    if (c !is null)
+      return c;
+
+    foreach (child; go.children) {
+      return findMainCamera(child);
+    }
+    return null;
   }
 }

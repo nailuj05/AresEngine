@@ -9,13 +9,24 @@ TEST_DIR    = build/testproject
 # Platform: PLATFORM_DESKTOP (default), PLATFORM_WEB, PLATFORM_DESKTOP (macOS/Windows future)
 PLATFORM ?= PLATFORM_DESKTOP
 
+# lua flags
+LUA_SRC_DIR = vendor/lua-5.4.8/src
+LUA_LIB     = $(BUILD_DIR)/liblua.a
+LUA_OBJ_DIR = $(BUILD_DIR)/lua_obj
+LUA_C_SRC = $(filter-out \
+    $(LUA_SRC_DIR)/lua.c \
+    $(LUA_SRC_DIR)/luac.c, \
+    $(wildcard $(LUA_SRC_DIR)/*.c))
+LUA_OBJS = $(patsubst $(LUA_SRC_DIR)/%.c, $(LUA_OBJ_DIR)/%.o, $(LUA_C_SRC))
+
+# general flags
 DFLAGS         = -I=vendor -I=engine -J=assets
 DFLAGS_RELEASE = -I=vendor -I=engine -J=assets -O -release
 CFLAGS_EXTRA   = 
 
 # Platform-specific link flags
 ifeq ($(PLATFORM), PLATFORM_DESKTOP)
-  LFLAGS = $(RAYLIB_LIB) -L-lGL -L-lm -L-lpthread -L-ldl -L-lrt -L-lX11
+  LFLAGS = $(RAYLIB_LIB) $(LUA_LIB) -L-lGL -L-lm -L-lpthread -L-ldl -L-lrt -L-lX11
 endif
 ifeq ($(PLATFORM), PLATFORM_WEB)
   CC     = emcc
@@ -27,6 +38,7 @@ RUNTIME_SRC  = $(shell find runtime/ -name '*.d')
 ENGINE_SRC   = $(shell find engine/  -name '*.d')
 EDITOR_SRC   = $(shell find editor/  -name '*.d')
 RAYLIB_D_SRC = $(shell find vendor/raylib/ -name '*.d')
+LUA_D_SRC = vendor/lua/lua.d
 
 RUNTIME = $(BUILD_DIR)/runtime
 EDITOR  = $(BUILD_DIR)/editor
@@ -34,6 +46,16 @@ EDITOR  = $(BUILD_DIR)/editor
 .PHONY: all runtime editor release install run-editor test-project clean clean-raylib
 
 all: runtime editor
+
+# lua
+$(LUA_OBJ_DIR)/%.o: $(LUA_SRC_DIR)/%.c | $(LUA_OBJ_DIR)
+	$(CC) -O2 -c $< -o $@
+
+$(LUA_OBJ_DIR):
+	mkdir -p $@
+
+$(LUA_LIB): $(LUA_OBJS)
+	ar rcs $@ $^
 
 # raylib
 $(RAYLIB_LIB): | $(BUILD_DIR)
@@ -48,13 +70,14 @@ $(RAYGUI_OBJ): vendor/raygui/raygui.c | $(BUILD_DIR)
 
 # runtime
 runtime: $(RUNTIME)
-$(RUNTIME): $(RUNTIME_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) | $(BUILD_DIR) $(RAYLIB_LIB)
+$(RUNTIME): $(RUNTIME_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) $(LUA_D_SRC) | $(BUILD_DIR) $(RAYLIB_LIB) $(LUA_LIB)
 	$(DC) $(DFLAGS) -of=$@ $^ $(LFLAGS)
 
 # editor
 editor: $(EDITOR) runtime
-$(EDITOR): $(EDITOR_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) $(RAYGUI_OBJ) | $(BUILD_DIR) $(RAYLIB_LIB)
+$(EDITOR):  $(EDITOR_SRC)  $(ENGINE_SRC) $(RAYLIB_D_SRC) $(RAYGUI_OBJ) $(LUA_D_SRC) | $(BUILD_DIR) $(RAYLIB_LIB) $(LUA_LIB)
 	$(DC) $(DFLAGS) -version=Editor -of=$@ $^ $(LFLAGS)
+
 
 release: DFLAGS = $(DFLAGS_RELEASE)
 release: CFLAGS_EXTRA = -O2
@@ -77,9 +100,13 @@ $(TEST_DIR): install
 
 test-project: install $(TEST_DIR)
 
-clean:
-	rm -rf $(BUILD_DIR)
-
 clean-raylib:
 	$(MAKE) -C $(RAYLIB_SRC) clean
 	rm -f $(RAYLIB_LIB)
+
+clean-lua:
+	rm -f $(LUA_LIB)
+	rm -rf $(LUA_OBJ_DIR)
+
+clean:
+	rm -rf $(BUILD_DIR)

@@ -110,8 +110,7 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
 
   static if (is(T == bool)) {
     GuiCheckBox(Rectangle(fr.x, oy, FIELD_H, FIELD_H), "".toStringz, &value);
-  }
-  else static if (is(T == float) || is(T == int)) {
+  } else static if (is(T == float) || is(T == int)) {
     if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
     if (!state.editing) {
@@ -120,13 +119,12 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
         else                        value = to!int(fromStringz(state.buffer.ptr));
       } catch (Exception) {}
     }
-  }
-  else static if (is(T == string)) {
+  } else static if (is(T == string)) {
     if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
-  }static if (is(T == Color)) {
+  } static if (is(T == Color)) {
     DrawRectangleRec(fr, value);
     DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
 
@@ -135,9 +133,9 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
 
     if (colorPicker.hasResult) {
       value = colorPicker.result;
+      colorPicker.hasResult = false;
     }
-  }
-  else static if (is(T == enum)) {
+  } else static if (is(T == enum)) {
     import std.traits : EnumMembers;
     enum opts = [__traits(allMembers, T)].join(";");
     int active = 0;

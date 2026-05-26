@@ -31,6 +31,7 @@ void drawInspector(Rectangle r, GameObject selected) {
   float y = r.y + 32;
   float w = r.width;
 
+  // Draw Name + Transform Fields
   drawField("Name", selected.name, selected.nameFS, x, y, w);
   y += ROW_H;
 
@@ -55,10 +56,17 @@ void drawInspector(Rectangle r, GameObject selected) {
     selected.transform.localScale = scl;
   y += ROW_H;
 
+  // Draw individual components
   foreach (component; selected.components) {
     GuiLine(Rectangle(x, y, w, 1), null);
     y += 8;
+
     GuiLabel(Rectangle(x + 8, y, w - 8, FIELD_H), component.name.toStringz);
+
+    if (GuiButton(Rectangle(x + w - 20 - 8, y, 20, 20), "x")) {
+      selected.removeComponent(component);
+    }
+    
     y += ROW_H;
     y = cast(float)component.drawInspector(cast(ulong)x + 8, cast(ulong)y, cast(ulong)w - 8);
   }

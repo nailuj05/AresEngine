@@ -40,6 +40,17 @@ class GameObject {
     return null;
   }
 
+  void removeComponent(T : Component)(T c) {
+    import std.algorithm : countUntil, remove;
+    auto idx = components.countUntil!"a is b"(c);
+    if (idx < 0) return;
+    version(Editor) 
+      c.onEditorDestroy();
+    else
+      c.onDestory();
+    components = components.remove(idx);
+  }
+  
   void start() {
     foreach (c; components)
       if (c.enabled) c.onStart();

@@ -81,6 +81,7 @@ int main(string[] args) {
     BeginDrawing();
       ClearBackground(Colors.BLACK);
       BeginMode3D(mainCamera.rcamera);
+        DrawGrid(20, 1.0f); // for debugging
         activeScene.draw();
       EndMode3D();
       DrawFPS(10, 10);

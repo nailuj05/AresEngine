@@ -152,19 +152,13 @@ private int drawGameObject(int ox, int oy, int width, GameObject current, ref Ga
         g_drop = DropInfo(current, z, true);
     }
 
-    // ghost
-    if (isDragged) {
-        DrawRectangleLinesEx(rowRect, 1, Fade(Colors.WHITE, 0.22f));
-        DrawText(current.name.toStringz(), cast(int)rowRect.x + PAD, cast(int)rowRect.y, 0, Fade(Colors.WHITE, 0.22f));
-        return oy + HEIGHT + PAD;
-    }
-
     // normal row
     Color bg = (current is selected) ? GetColor(0x5F5F5CFF)
              : hovered               ? GetColor(0x3A3A3AFF)
              :                         Colors.BLANK;
     DrawRectangleRec(rowRect, bg);
-    DrawText(current.name.toStringz(), cast(int)rowRect.x + PAD, cast(int)rowRect.y, 0, Colors.WHITE);
+    DrawPolyLines(Vector2(rowRect.x + 10, rowRect.y + 10), 4, 6, 0.0f, Colors.WHITE);
+    DrawText(current.name.toStringz(), cast(int)rowRect.x + HEIGHT, cast(int)rowRect.y, 0, Colors.WHITE);
     DrawLineEx(Vector2(rowRect.x, rowRect.y + rowRect.height), Vector2(rowRect.x + rowRect.width, rowRect.y + rowRect.height), 1, Colors.GRAY);
 
     // expand/collapse button

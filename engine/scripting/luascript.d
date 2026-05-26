@@ -1,46 +1,50 @@
 module engine.scripting.luascript;
 
-import std.string : toStringz;
+import std.json;
+import std.string : fromStringz, toStringz;
 
 import lua;
 
 import engine.core.component;
 import engine.scripting.luaruntime;
+import engine.scripting.luafielddef;
 
 class LuaScript : Component {
   mixin Named!"LuaScript";
 
   string scriptPath;
 
+  LuaFieldDef[] fieldDefs;
   private int instanceRef = LUA_NOREF;
   private bool hasOnUpdate;
   
   override void onStart() {
     auto L = get_luaruntime();
-
     if (luaL_loadfile(L, scriptPath.toStringz) != LUA_OK || lua_pcall(L, 0, 1, 0) != LUA_OK) {
-        logError(L);
-        return;
+      logError(L);
+      return;
     }
-    // stack: [classTable]
+    // [classTable]
 
-    // Create instance: setmetatable({}, classTable)
-    lua_newtable(L);                     // [classTable, instance]
-    lua_pushvalue(L, -2);                // [classTable, instance, classTable]
-    lua_setfield(L, -2, "__index");      // instance.__index = classTable (manual; see note)
-    lua_pushvalue(L, -2);                // [classTable, instance, classTable]
-    lua_setmetatable(L, -2);             // setmetatable(instance, classTable)
-    // stack: [classTable, instance]
+    parseFieldDefs(L);
 
-    // Inject self.gameObject = this owner
+    // create instance and set classTable as its metatable
+    lua_newtable(L);                         // [classTable, instance]
+    lua_pushvalue(L, -2);                    // [classTable, instance, classTable]
+    lua_setfield(L, -2, "__index");          // instance.__index = classTable
+    lua_pushvalue(L, -2);                    // [classTable, instance, classTable]
+    lua_setmetatable(L, -2);                 // setmetatable(instance, classTable)
+    // [classTable, instance]
+
     lua_pushlightuserdata(L, cast(void*)owner);
-    lua_setfield(L, -2, "gameObject");
+    lua_setfield(L, -2, "gameObject");       // instance.gameObject = owner
 
-    // Pin the instance in the registry, prevents Lua GC from collecting it
-    instanceRef = luaL_ref(L, LUA_REGISTRYINDEX);
-    lua_pop(L, 1);
+    instanceRef = luaL_ref(L, LUA_REGISTRYINDEX); // pin instance; pops it
+    lua_pop(L, 1);                           // pop classTable
+    
+    // write defaults into instance
+    applyFields(L);
 
-    // Cache whether onUpdate exists
     pushSelf(L);
     lua_getfield(L, -1, "onUpdate");
     hasOnUpdate = lua_isfunction(L, -1);

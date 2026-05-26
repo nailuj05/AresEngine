@@ -11,7 +11,7 @@ import engine.core.gameobject;
 import editor.style;
 
 private enum PAD         = 4;
-private enum INSET       = 32;
+private enum INSET       = 20;
 private enum HEIGHT      = 20;
 private enum DROP_STRIP  = 5;
 private enum DRAG_THRESH = 4;
@@ -159,7 +159,7 @@ private int drawGameObject(int ox, int oy, int width, GameObject current, ref Ga
     }
 
     // normal row
-    Color bg = (current is selected) ? GetColor(0x2060FFFF)
+    Color bg = (current is selected) ? GetColor(0x5F5F5CFF)
              : hovered               ? GetColor(0x3A3A3AFF)
              :                         Colors.BLANK;
     DrawRectangleRec(rowRect, bg);

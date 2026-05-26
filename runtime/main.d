@@ -11,6 +11,7 @@ import engine.core.component;
 import engine.core.gameobject;
 import engine.scene.scene;
 import engine.scene.loader;
+import engine.scripting.luaruntime;
 import engine.rendering.camera : Camera;
 
 static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("icons/logo-icon.png");

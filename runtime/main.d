@@ -89,6 +89,8 @@ int main(string[] args) {
   }
 
   // Destory, unload, end lua
+  close_luaruntime();
+  activeScene.destroy();
 
   return 0;
 }

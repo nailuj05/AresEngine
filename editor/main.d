@@ -17,6 +17,7 @@ import engine.scene.scene;
 import engine.scene.loader;
 import engine.rendering.camera : Camera;
 import engine.rendering.meshrenderer;
+import engine.scripting.luaruntime;
 import engine.oscillator;
 
 import editor.style;
@@ -193,7 +194,8 @@ int main(string[] args) {
     gizmo.space = cast(GizmoSpace)selection.space;
   }
 
-  // TODO: end lua runtime
+  close_luaruntime();
+
   saveScene(activeScene, activeScene.name ~ ".json");
   activeScene.editorDestroy();
   saveManifest();
@@ -267,7 +269,7 @@ void drawColorPickerDialog() {
 void handleProject(int item) {
   switch (item) {
     case 0: /*Save    */ saveManifest(); break;
-    case 1: /*Settings*/ settingsDialog.show(projectManifest); break; // TODO: Settings Panel
+    case 1: /*Settings*/ settingsDialog.show(projectManifest); break;
     case 2: /*Exit    */ exitRequested = true; break;
   default: break;
   }

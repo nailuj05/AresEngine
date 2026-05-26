@@ -10,6 +10,7 @@ import engine.core.gameobject;
 
 import editor.style;
 
+// TODO: move other "magic" colors, numbers etc up here
 private enum PAD         = 4;
 private enum INSET       = 20;
 private enum HEIGHT      = 20;

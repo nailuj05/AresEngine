@@ -85,7 +85,7 @@ MenuAction drawTopBar(Rectangle r, string sceneName) {
     PLAY_W,
     r.height - BUTTON_PAD * 2
   );
-  if (GuiButton(playRect, "#131#"))
+  if (GuiButton(playRect, "#119#"))
     result.play = true;
 
   auto sn = format!"Scene: %s"(sceneName).toStringz();

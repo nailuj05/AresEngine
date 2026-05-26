@@ -18,6 +18,8 @@ class GameObject {
     FieldState[3] posFS;
     FieldState[3] rotFS;
     FieldState[3] scaleFS;
+
+    bool expanded = true;
   }
     
   T addComponent(T : Component)() {
@@ -67,6 +69,9 @@ class GameObject {
     // draw ctx?
     foreach (c; components)
       if (c.enabled) c.onDraw();
+
+    foreach (c; children)
+      if (c.active) c.draw();
   }
 
   void destroy() {

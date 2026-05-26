@@ -122,7 +122,7 @@ int main(string[] args) {
  }
 
   SetTraceLogLevel(TraceLogLevel.LOG_WARNING);
-  initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", -1));
+  initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", 60));
   scope(exit) closeWindow();
 
   Font font = LoadFontFromMemory(".ttf", FONT_DATA.ptr, cast(int)FONT_DATA.length, TEXT_SZ, null, 0);

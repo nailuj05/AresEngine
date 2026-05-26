@@ -38,7 +38,6 @@ class Scene {
   void draw() {
     foreach (go; roots)
       if (go.active) go.draw();
-    // draw all children too
   }
 
   void destroy() {

@@ -92,7 +92,7 @@ install: editor runtime
 	cp $(BUILD_DIR)/runtime  $(INSTALL_DIR)/ares-runtime
 
 run-editor: install
-	ares-editor $(TEST_DIR)
+	ares-editor --profile $(TEST_DIR)
 
 $(TEST_DIR): install
 	mkdir -p $(TEST_DIR)

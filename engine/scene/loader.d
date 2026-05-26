@@ -5,7 +5,7 @@ import std.stdio  : writeln;
 import std.file   : readText, write;
 import std.traits : FieldNameTuple, Unqual, hasUDA;
 
-import raylib : Vector3, Quaternion;
+import raylib : Color, Vector3, Quaternion;
 
 import engine.scene.scene;
 import engine.core.gameobject;
@@ -54,8 +54,11 @@ private JSONValue serializeFields(T)(T obj) {
 
         static if      (is(FT == bool))    result[field] = JSONValue(v);
         else static if (is(FT == float))   result[field] = JSONValue(v);
+        else static if (is(FT == int))     result[field] = JSONValue(v);
         else static if (is(FT == string))  result[field] = JSONValue(v);
-        // fail here
+        else static if (is(FT == Color))   result[field] = serializeColor(v);
+        else static if (is(FT == enum))    result[field] = JSONValue(cast(long)v);
+        else static assert(false, "Unsupported field type: " ~ FT.stringof);
       }
     }
   }
@@ -72,7 +75,11 @@ private void deserializeFields(T)(T obj, JSONValue fields) {
           auto jv = *p;
           static if      (is(FT == bool))   __traits(getMember, obj, field) = jv.boolean;
           else static if (is(FT == float))  __traits(getMember, obj, field) = jv.floating;
+          else static if (is(FT == int))    __traits(getMember, obj, field) = cast(int)jv.integer;
           else static if (is(FT == string)) __traits(getMember, obj, field) = jv.str;
+          else static if (is(FT == Color))  __traits(getMember, obj, field) = toColor(jv);
+          else static if (is(FT == enum))   __traits(getMember, obj, field) = cast(FT)jv.integer;
+          else static assert(false, "Unsupported field type: " ~ FT.stringof);
         }
       }
     }
@@ -80,114 +87,123 @@ private void deserializeFields(T)(T obj, JSONValue fields) {
 }
 
 
-  // components
+// components
 
-  private JSONValue serializeComponent(Component c) {
-    static foreach (T; KnownComponents) {
-      if (auto t = cast(T)c) {
-        return JSONValue([
-          "type":    JSONValue(T.typeName),
-          "enabled": JSONValue(c.enabled),
-          "fields":  serializeFields(t),
-        ]);
-      }
+private JSONValue serializeComponent(Component c) {
+  static foreach (T; KnownComponents) {
+    if (auto t = cast(T)c) {
+      return JSONValue([
+                        "type":    JSONValue(T.typeName),
+                        "enabled": JSONValue(c.enabled),
+                        "fields":  serializeFields(t),
+                        ]);
     }
-
-    assert(false, "Unknown component: " ~ c.name);
   }
 
-  private Component deserializeComponent(JSONValue j, GameObject owner) {
-    immutable type = j["type"].str;
-    static foreach (T; KnownComponents) {
-      if (T.typeName == type) {
-        auto c  = new T();
-        c.owner   = owner;
-        c.enabled = j["enabled"].boolean;
-        deserializeFields(c, j["fields"]);
-        return c;
-      }
+  assert(false, "Unknown component: " ~ c.name);
+}
+
+private Component deserializeComponent(JSONValue j, GameObject owner) {
+  immutable type = j["type"].str;
+  static foreach (T; KnownComponents) {
+    if (T.typeName == type) {
+      auto c  = new T();
+      c.owner   = owner;
+      c.enabled = j["enabled"].boolean;
+      deserializeFields(c, j["fields"]);
+      return c;
     }
-
-    assert(false, "Unknown component type in scene file: " ~ type);
   }
 
+  assert(false, "Unknown component type in scene file: " ~ type);
+}
 
-  // transform
 
-  private JSONValue serializeVec3(Vector3 v) {
-    return JSONValue(["x": JSONValue(v.x), "y": JSONValue(v.y), "z": JSONValue(v.z)]);
+// transform
+
+private JSONValue serializeVec3(Vector3 v) {
+  return JSONValue(["x": JSONValue(v.x), "y": JSONValue(v.y), "z": JSONValue(v.z)]);
+}
+
+private JSONValue serializeQuat(Quaternion q) {
+  return JSONValue(["x": JSONValue(q.x), "y": JSONValue(q.y),
+                    "z": JSONValue(q.z), "w": JSONValue(q.w)]);
+}
+
+private Vector3 toVec3(JSONValue j) {
+  return Vector3(cast(float)j["x"].floating,
+                 cast(float)j["y"].floating,
+                 cast(float)j["z"].floating);
+}
+
+private Quaternion toQuat(JSONValue j) {
+  return Quaternion(cast(float)j["x"].floating,
+                    cast(float)j["y"].floating,
+                    cast(float)j["z"].floating,
+                    cast(float)j["w"].floating);
+}
+
+private JSONValue serializeTransform(ref const Transform t) {
+  return JSONValue(["position": serializeVec3(t.position),
+                    "rotation": serializeQuat(t.rotation),
+                    "scale":    serializeVec3(t.scale),
+                    ]);
+}
+
+private void applyTransform(ref Transform t, JSONValue j) {
+  t.position = toVec3(j["position"]);
+  t.rotation = toQuat(j["rotation"]);
+  t.scale    = toVec3(j["scale"]);
+}
+
+
+// gameobject
+
+private JSONValue serializeGO(GameObject go) {
+  JSONValue[] comps;
+  foreach (c; go.components)
+    comps ~= serializeComponent(c);
+
+  JSONValue[] children;
+  foreach (child; go.children) {
+    children ~= serializeGO(child);
   }
 
-  private JSONValue serializeQuat(Quaternion q) {
-    return JSONValue(["x": JSONValue(q.x), "y": JSONValue(q.y),
-                      "z": JSONValue(q.z), "w": JSONValue(q.w)]);
+  return JSONValue(["name":       JSONValue(go.name),
+                    "active":     JSONValue(go.active),
+                    "transform":  serializeTransform(go.transform),
+                    "components": JSONValue(comps),
+                    "children":   JSONValue(children),
+                    ]);
+}
+
+private GameObject deserializeGO(JSONValue j) {
+  auto go   = new GameObject();
+  go.name   = j["name"].str;
+  go.active = j["active"].boolean;
+  applyTransform(go.transform, j["transform"]);
+
+  foreach (cj; j["components"].array) {
+    go.components ~= deserializeComponent(cj, go);
   }
 
-  private Vector3 toVec3(JSONValue j) {
-    return Vector3(
-                   cast(float)j["x"].floating,
-                   cast(float)j["y"].floating,
-                   cast(float)j["z"].floating);
+  foreach (childJ; j["children"].array) {
+    auto child = deserializeGO(childJ);
+    go.children ~= child;
   }
 
-  private Quaternion toQuat(JSONValue j) {
-    return Quaternion(
-                      cast(float)j["x"].floating,
-                      cast(float)j["y"].floating,
-                      cast(float)j["z"].floating,
-                      cast(float)j["w"].floating);
-  }
+  return go;
+}
 
-  private JSONValue serializeTransform(ref const Transform t) {
-    return JSONValue([
-                      "position": serializeVec3(t.position),
-                      "rotation": serializeQuat(t.rotation),
-                      "scale":    serializeVec3(t.scale),
-                      ]);
-  }
+// helpers
 
-  private void applyTransform(ref Transform t, JSONValue j) {
-    t.position = toVec3(j["position"]);
-    t.rotation = toQuat(j["rotation"]);
-    t.scale    = toVec3(j["scale"]);
-  }
-
-
-  // gameobject
-
-  private JSONValue serializeGO(GameObject go) {
-    JSONValue[] comps;
-    foreach (c; go.components)
-      comps ~= serializeComponent(c);
-
-    JSONValue[] children;
-    foreach (child; go.children) {
-      children ~= serializeGO(child);
-    }
-
-    return JSONValue([
-                      "name":       JSONValue(go.name),
-                      "active":     JSONValue(go.active),
-                      "transform":  serializeTransform(go.transform),
-                      "components": JSONValue(comps),
-                      "children":   JSONValue(children),
-                      ]);
-  }
-
-  private GameObject deserializeGO(JSONValue j) {
-    auto go   = new GameObject();
-    go.name   = j["name"].str;
-    go.active = j["active"].boolean;
-    applyTransform(go.transform, j["transform"]);
-
-    foreach (cj; j["components"].array) {
-      go.components ~= deserializeComponent(cj, go);
-    }
-
-    foreach (childJ; j["children"].array) {
-      auto child = deserializeGO(childJ);
-      go.children ~= child;
-    }
-
-    return go;
-  }
+private JSONValue serializeColor(Color c) {
+  return JSONValue(["r": JSONValue(c.r), "g": JSONValue(c.g), "b": JSONValue(c.b), "a": JSONValue(c.a)]);
+}
+  
+private Color toColor(JSONValue j) {
+  return Color(cast(ubyte)j["r"].integer,
+               cast(ubyte)j["g"].integer,
+               cast(ubyte)j["b"].integer,
+               cast(ubyte)j["a"].integer);
+}

@@ -87,5 +87,7 @@ int main(string[] args) {
     EndDrawing();
   }
 
+  // Destory, unload, end lua
+
   return 0;
 }

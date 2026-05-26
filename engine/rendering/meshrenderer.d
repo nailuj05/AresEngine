@@ -33,10 +33,19 @@ class MeshRenderer : Component {
   override void onDestroy() {
     UnloadModel(model);
   }
-
+  
   version(Editor) {
     import editor.inspector.drawer;
+  
+    override void onEditorStart() {
+      mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
+      model = LoadModelFromMesh(mesh);
+    }
 
+    override void onEditorDestroy() {
+      UnloadModel(model);
+    }
+    
     private FieldState[string] fieldStates;
     
     override ulong drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {

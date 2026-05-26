@@ -1,12 +1,14 @@
 module lua;
 
-extern(C) @nogc nothrow:
+extern(C) nothrow:
 
 // Opaque state
 struct lua_State;
 
 // Core types
-alias lua_CFunction   = int function(lua_State* L);
+alias lua_CFunction   = extern(C) int function(lua_State* L);
+alias lua_KFunction   = extern(C) int function(lua_State* L, int status, lua_KContext ctx);
+alias lua_KContext    = ptrdiff_t;
 alias lua_Integer     = long;
 alias lua_Number      = double;
 alias lua_Unsigned    = ulong;
@@ -35,20 +37,28 @@ enum LUA_TTHREAD        =  8;
 enum LUA_REGISTRYINDEX = -1001000;
 enum LUA_MULTRET       = -1;
 
+enum LUA_NOREF         = -2;
+enum LUA_REFNIL        = -1;
+
 // State
 lua_State* luaL_newstate();
 void       lua_close(lua_State* L);
 void       luaL_openlibs(lua_State* L);
 
 // Stack
-int  lua_gettop(lua_State* L);
-void lua_settop(lua_State* L, int idx);
-void lua_pushvalue(lua_State* L, int idx);
-void lua_rotate(lua_State* L, int idx, int n);      // backing lua_insert
-void lua_copy(lua_State* L, int fromidx, int toidx);
-void lua_remove(lua_State* L, int idx);
-int  lua_absindex(lua_State* L, int idx);
-int  lua_checkstack(lua_State* L, int n);
+int          lua_gettop(lua_State* L);
+void         lua_settop(lua_State* L, int idx);
+void         lua_pushvalue(lua_State* L, int idx);
+void         lua_rotate(lua_State* L, int idx, int n);      // backing lua_insert
+void         lua_copy(lua_State* L, int fromidx, int toidx);
+void         lua_remove(lua_State* L, int idx);
+int          lua_absindex(lua_State* L, int idx);
+int          lua_checkstack(lua_State* L, int n);
+void         lua_concat(lua_State* L, int n);
+void         lua_len(lua_State* L, int idx);
+int          lua_next(lua_State* L, int idx);   // table iteration
+const(char)* lua_typename(lua_State* L, int tp);
+int          lua_error(lua_State* L);
 
 // Push
 void lua_pushnil(lua_State* L);
@@ -78,22 +88,26 @@ int  lua_rawgeti(lua_State* L, int idx, lua_Integer n);
 void lua_rawseti(lua_State* L, int idx, lua_Integer n);
 int  lua_getfield(lua_State* L, int idx, const(char)* k);
 void lua_setfield(lua_State* L, int idx, const(char)* k);
+int  lua_setmetatable(lua_State* L, int objindex);
 
 // Globals
 int  lua_getglobal(lua_State* L, const(char)* name);
 void lua_setglobal(lua_State* L, const(char)* name);
 
+
+int  luaL_ref  (lua_State* L, int t);
+void luaL_unref(lua_State* L, int t, int ref_);
+
+// aux
+void         luaL_traceback(lua_State* L, lua_State* L1, const(char)* msg, int level);
+void         luaL_where(lua_State* L, int lvl);
+int          luaL_dostring(lua_State* L, const(char)* s);
+
 // Call / load
-
-// Continuations (needed as backing functions for macros)
-alias lua_KContext  = ptrdiff_t;
-alias lua_KFunction = int function(lua_State* L, int status, lua_KContext ctx);
-
 int lua_pcallk(lua_State* L, int nargs, int nresults, int msgh, lua_KContext ctx, lua_KFunction k); // backs lua_pcall
 int luaL_loadfilex(lua_State* L, const(char)* filename, const(char)* mode); // backs luaL_loadfile
 
 int luaL_loadstring(lua_State* L, const(char)* s);
-int luaL_loadfile(lua_State* L, const(char)* filename);
 
 // Error / aux
 const(char)* luaL_tolstring(lua_State* L, int idx, size_t* len);
@@ -122,12 +136,12 @@ void lua_pop(lua_State* L, int n) {
 void lua_insert(lua_State* L, int idx) {
   lua_rotate(L, idx, 1);
 }
-void lua_newuserdata(lua_State* L, size_t sz) {
-  lua_newuserdatauv(L, sz, 1);
+void* lua_newuserdata(lua_State* L, size_t sz) {
+    return lua_newuserdatauv(L, sz, 1);
 }
 void lua_register(lua_State* L, const(char)* name, lua_CFunction f) {
   lua_pushcclosure(L, f, 0);
-  lua_setfield(L, LUA_REGISTRYINDEX, name);
+  lua_setglobal(L, name);
 }
 void lua_newtable(lua_State* L) {
   lua_createtable(L, 0, 0);
@@ -164,4 +178,13 @@ int luaL_loadfile(lua_State* L, const(char)* filename) {
 }
 int luaL_dofile(lua_State* L, const(char)* filename) {
     return luaL_loadfilex(L, filename, null) || lua_pcallk(L, 0, LUA_MULTRET, 0, 0, null);
+}
+
+pragma(inline, true)
+int lua_upvalueindex(int i) {
+    return LUA_REGISTRYINDEX - i;
+}
+pragma(inline, true)
+int luaL_getmetatable(lua_State* L, const(char)* name) {
+    return lua_getfield(L, LUA_REGISTRYINDEX, name);
 }

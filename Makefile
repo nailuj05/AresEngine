@@ -6,7 +6,7 @@ INSTALL_DIR = $(HOME)/.local/bin
 BUILD_DIR   = build
 TEST_DIR    = build/testproject
 
-# Platform: PLATFORM_DESKTOP (default), PLATFORM_WEB, PLATFORM_DESKTOP (macOS/Windows future)
+# Platform: PLATFORM_DESKTOP (default), future: PLATFORM_WEB
 PLATFORM ?= PLATFORM_DESKTOP
 
 # lua flags
@@ -28,11 +28,11 @@ CFLAGS_EXTRA   =
 ifeq ($(PLATFORM), PLATFORM_DESKTOP)
   LFLAGS = $(RAYLIB_LIB) $(LUA_LIB) -L-lGL -L-lm -L-lpthread -L-ldl -L-lrt -L-lX11
 endif
-ifeq ($(PLATFORM), PLATFORM_WEB)
-  CC     = emcc
-  DC     = ldc2
-  LFLAGS = $(RAYLIB_LIB)  # emscripten provides everything else
-endif
+# ifeq ($(PLATFORM), PLATFORM_WEB)
+#   CC     = emcc
+#   DC     = ldc2
+#   LFLAGS = $(RAYLIB_LIB)  # emscripten provides everything else
+# endif
 
 RUNTIME_SRC  = $(shell find runtime/ -name '*.d')
 ENGINE_SRC   = $(shell find engine/  -name '*.d')

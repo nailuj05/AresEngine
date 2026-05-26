@@ -25,7 +25,11 @@ class GameObject {
     c.owner = this;
     components ~= c;
 
-    if (!started) c.onStart();
+    version(Editor) {
+      if (!started) c.onEditorStart();
+    } else {
+      if (!started) c.onStart();
+    }
       
     return c;
   }
@@ -54,11 +58,28 @@ class GameObject {
       if (c.enabled) c.onDraw();
   }
 
-  void destory() {
+  void destroy() {
     foreach (c; components)
       c.onDestroy();
 
     foreach (go; children)
       go.destroy();
+  }
+
+  version(Editor) {
+    void editorStart() {
+      foreach (c; components)
+        if (c.enabled) c.onEditorStart();
+      
+      started = true;
+    }
+
+    void editorDestroy() {
+      foreach (c; components)
+        c.onEditorDestroy();
+      
+      foreach (go; children)
+        go.editorDestroy();
+    }
   }
 }

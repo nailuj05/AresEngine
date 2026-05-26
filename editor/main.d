@@ -145,7 +145,7 @@ int main(string[] args) {
     return 1;
   }
   activeScene = loadScene(mainScene);
-  activeScene.start();
+  activeScene.editorStart();
 
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();
@@ -172,9 +172,11 @@ int main(string[] args) {
       drawFolder(folder);
       GuiSetState(GuiState.STATE_NORMAL);
       auto action = drawTopBar(topBar, activeScene.name);
+      
       drawSettingsDialog(settingsDialog);
       drawFileDialog(fileDialog);
       drawColorPickerDialog();
+
       if (profile) DrawFPS(GetScreenWidth() - 100, 2);
     EndDrawing();
 
@@ -191,7 +193,9 @@ int main(string[] args) {
     gizmo.space = cast(GizmoSpace)selection.space;
   }
 
+  // TODO: end lua runtime
   saveScene(activeScene, activeScene.name ~ ".json");
+  activeScene.editorDestroy();
   saveManifest();
 
   return 0;

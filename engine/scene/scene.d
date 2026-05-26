@@ -21,7 +21,7 @@ class Scene {
   }
 
   void destoryObject(GameObject go) {
-    go.destory();
+    go.destroy();
     roots = remove!(x => x is go)(roots);
   }
 
@@ -66,5 +66,24 @@ class Scene {
       return findMainCamera(child);
     }
     return null;
+  }
+
+  version(Editor) {
+    void editorStart() {
+      foreach (go; roots)
+        go.editorStart();
+    }
+
+    void editorDestroy() {
+      foreach (go; roots)
+        go.editorDestroy();
+
+      roots = [];
+    }
+
+    void editorDestroyObject(GameObject go) {
+      go.editorDestroy();
+      roots = remove!(x => x is go)(roots);
+    }
   }
 }

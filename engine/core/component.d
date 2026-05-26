@@ -6,9 +6,10 @@ import engine.core.gameobject;
 
 // known components, needed for serialization and add component
 import engine.rendering.meshrenderer: MeshRenderer;
+import engine.scripting.luascript : LuaScript;
 import engine.rendering.camera : Camera;
 import engine.oscillator : Oscillator;
-alias KnownComponents = AliasSeq!(MeshRenderer, Camera, Oscillator);
+alias KnownComponents = AliasSeq!(Camera, LuaScript, Oscillator, MeshRenderer);
 
 // @DontSerialize Field
 struct DontSerialize {}
@@ -27,10 +28,12 @@ abstract class Component {
   bool enabled = true;
   @property string name() const;
 
+  void onEditorStart()    {}
   void onStart()          {}
   void onUpdate(float dt) {}
   void onDraw()           {}
   void onDestroy()        {}
+  void onEditorDestroy()  {}
 
   version(Editor) {
     abstract ulong drawInspector(ulong offsetX, ulong offsetY, ulong panelW);

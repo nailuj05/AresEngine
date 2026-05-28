@@ -115,17 +115,13 @@ class LuaScript : Component, IExtraSerializable {
 
   // --- Helpers ---
   private void reload() {
-    import std.stdio;
     def        = null;
     fieldValues = null;
-    
-    writeln(1);
     
     if (instanceRef != LUA_NOREF) {
         unloadScript();
     }
 
-    writeln(2);
     if (_scriptPath.length)
         loadScript();
   }

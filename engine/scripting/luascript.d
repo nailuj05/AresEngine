@@ -31,7 +31,6 @@ class LuaScript : Component, IExtraSerializable {
   private LuaScriptDef def;
   private int instanceRef = LUA_NOREF;
   private bool hasOnUpdate;
-  private bool started;
 
   // Convenience: look up field index by name
   int fieldIndex(string name) {
@@ -43,13 +42,11 @@ class LuaScript : Component, IExtraSerializable {
 
   // --- Component Functions ---
   override void onStart() {
-    started = true;
     loadScript();
     callMethod("onStart", 0);
   }
 
   override void onEditorStart() {
-    started = true;
     loadScript();
   }
 
@@ -122,12 +119,13 @@ class LuaScript : Component, IExtraSerializable {
     def        = null;
     fieldValues = null;
     
-    if (!started) return; // deserialization path: do nothing
+    writeln(1);
     
     if (instanceRef != LUA_NOREF) {
         unloadScript();
     }
 
+    writeln(2);
     if (_scriptPath.length)
         loadScript();
   }

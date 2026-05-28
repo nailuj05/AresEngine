@@ -11,6 +11,16 @@ import engine.scene.scene;
 import engine.core.gameobject;
 import engine.core.component;
 import engine.core.transform;
+import engine.core.iextraserializable;
+
+template isSerializableField(T) {
+    enum isSerializableField = is(T == bool)
+                            || is(T == float)
+                            || is(T == int)
+                            || is(T == string)
+                            || is(T == Color)
+                            || is(T == enum);
+}
 
 // public API
 
@@ -45,11 +55,12 @@ Scene loadScene(string path) {
 
 private JSONValue serializeFields(T)(T obj) {
   JSONValue result = JSONValue((JSONValue[string]).init);
-  static foreach (field; FieldNameTuple!(Unqual!T)) {
-    {
+  static foreach (field; FieldNameTuple!(Unqual!T)) {{
       enum prot = __traits(getProtection, __traits(getMember, Unqual!T, field));
-      static if (prot == "public" && !hasUDA!(__traits(getMember, Unqual!T, field), DontSerialize)) {
-        alias FT = typeof(__traits(getMember, obj, field));
+      alias FT = typeof(__traits(getMember, obj, field));
+      static if (prot == "public"
+                 && !hasUDA!(__traits(getMember, Unqual!T, field), DontSerialize)
+                 && isSerializableField!FT) {
         auto  v  = __traits(getMember, obj, field);
 
         static if      (is(FT == bool))    result[field] = JSONValue(v);
@@ -58,19 +69,22 @@ private JSONValue serializeFields(T)(T obj) {
         else static if (is(FT == string))  result[field] = JSONValue(v);
         else static if (is(FT == Color))   result[field] = serializeColor(v);
         else static if (is(FT == enum))    result[field] = JSONValue(cast(long)v);
-        else static assert(false, "Unsupported field type: " ~ FT.stringof);
       }
     }
   }
+  static if (is(T : IExtraSerializable))
+    foreach (k, v; obj.serializeExtra().object)
+      result[k] = v;
   return result;
 }
 
 private void deserializeFields(T)(T obj, JSONValue fields) {
-  static foreach (field; FieldNameTuple!(Unqual!T)) {
-    {
+  static foreach (field; FieldNameTuple!(Unqual!T)) {{
       enum prot = __traits(getProtection, __traits(getMember, Unqual!T, field));
-      static if (prot == "public" && !hasUDA!(__traits(getMember, Unqual!T, field), DontSerialize)) {
-        alias FT = typeof(__traits(getMember, obj, field));
+      alias FT = typeof(__traits(getMember, obj, field));
+      static if (prot == "public"
+                 && !hasUDA!(__traits(getMember, Unqual!T, field), DontSerialize)
+                 && isSerializableField!FT) {
         if (auto p = field in fields.object) {
           auto jv = *p;
           static if      (is(FT == bool))   __traits(getMember, obj, field) = jv.boolean;
@@ -79,11 +93,12 @@ private void deserializeFields(T)(T obj, JSONValue fields) {
           else static if (is(FT == string)) __traits(getMember, obj, field) = jv.str;
           else static if (is(FT == Color))  __traits(getMember, obj, field) = toColor(jv);
           else static if (is(FT == enum))   __traits(getMember, obj, field) = cast(FT)jv.integer;
-          else static assert(false, "Unsupported field type: " ~ FT.stringof);
         }
       }
     }
   }
+  static if (is(T : IExtraSerializable))
+    obj.deserializeExtra(fields);
 }
 
 

@@ -34,7 +34,7 @@ import editor.hierarchy.hierarchy;
 
 // Comp-time embedded assets
 static immutable ubyte[] FONT_DATA  = cast(immutable ubyte[]) import("fonts/Inter.ttf");
-static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("icons/logo-icon.png");
+static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("logo/logo-icon.png");
 
 // Project
 private string   projectPath;

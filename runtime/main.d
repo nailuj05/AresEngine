@@ -14,7 +14,7 @@ import engine.scene.loader;
 import engine.scripting.luaruntime;
 import engine.rendering.camera : Camera;
 
-static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("icons/logo-icon.png");
+static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("logo/logo-icon.png");
 
 Scene activeScene;
 Camera mainCamera;

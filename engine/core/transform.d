@@ -19,11 +19,9 @@ private:
   bool       _localDirty = true;
   bool       _worldDirty = true;
 
-  // Children list for dirty propagation
-  Transform*[] _children;
-
+  package Transform* parent = null;
+  
 public:
-  Transform* parent = null;
 
   @property const(Vector3) localPosition() const nothrow {
     return _localPosition;
@@ -49,7 +47,7 @@ public:
     markDirty();
   }
 
-  @property const(Vector3) position() const nothrow {
+  @property Vector3 position() nothrow {
     return worldPosition();
   }
   @property void position(Vector3 worldPos) nothrow {
@@ -63,7 +61,7 @@ public:
     markDirty();
   }
   
-  @property const(Quaternion) rotation() const nothrow {
+  @property Quaternion rotation() nothrow {
     return worldRotation();
   }
   @property void rotation(Quaternion worldRot) nothrow {
@@ -76,7 +74,7 @@ public:
     markDirty();
   }
 
-  @property const(Vector3) scale() const nothrow {
+  @property Vector3 scale() nothrow {
     return worldScale();
   }
   @property void scale(Vector3 ws) nothrow {
@@ -95,15 +93,15 @@ public:
     markDirty();
   }
 
-  @property Vector3 forward() const nothrow {
+  @property Vector3 forward() nothrow {
     return Vector3Normalize(Vector3RotateByQuaternion(Vector3(0, 0, 1), rotation));
   }
 
-  @property Vector3 up() const nothrow {
+  @property Vector3 up() nothrow {
     return Vector3Normalize(Vector3RotateByQuaternion(Vector3(0, 1, 0), rotation));
   }
 
-  @property Vector3 right() const nothrow {
+  @property Vector3 right() nothrow {
     return Vector3Normalize(Vector3RotateByQuaternion(Vector3(1, 0, 0), rotation));
   }
 
@@ -118,24 +116,28 @@ public:
     return _worldMatrix;
   }
 
-  // Attach a child and set its parent pointer.
-  void addChild(Transform* child) nothrow {
-    assert(child !is null);
-    child.parent = &this;
-    _children   ~= child;
-    child.markDirty();
+  // local <-> world point conversion (includes translation)
+  Vector3 transformPoint(Vector3 localPoint) nothrow {
+    return Vector3Transform(localPoint, worldMatrix());
+  }
+  Vector3 inverseTransformPoint(Vector3 worldPoint) nothrow {
+    return Vector3Transform(worldPoint, MatrixInvert(worldMatrix()));
   }
 
-  // Detach a child and clear its parent pointer.
-  void removeChild(Transform* child) nothrow {
-    import std.algorithm : remove;
-    _children  = _children.remove!(c => c is child);
-    child.parent = null;
-    child.markDirty();
+  // direction conversion: rotation only, no translation or scale
+  Vector3 transformDirection(Vector3 localDir) nothrow {
+    return Vector3RotateByQuaternion(localDir, rotation());
+  }
+  Vector3 inverseTransformDirection(Vector3 worldDir) nothrow {
+    return Vector3RotateByQuaternion(worldDir, QuaternionInvert(rotation()));
   }
 
-private:
+  @property Matrix worldToLocalMatrix() nothrow {
+    return MatrixInvert(worldMatrix());
+  }
 
+
+package:
   void markDirty() nothrow {
     _localDirty = true;
     markWorldDirty();
@@ -144,10 +146,9 @@ private:
   // Mark only the world matrix dirty and propagate to children.
   void markWorldDirty() nothrow {
     _worldDirty = true;
-    foreach (child; _children)
-      child.markWorldDirty();
   }
 
+private:
   void updateLocalMatrix() nothrow {
     if (!_localDirty)
       return;
@@ -176,31 +177,32 @@ private:
     _worldDirty = false;
   }
 
-  Vector3 worldPosition() const nothrow {
-    if (parent is null)
-      return _localPosition;
-    auto parentPos = parent.position;
-    return Vector3(
-      parentPos.x + _localPosition.x,
-      parentPos.y + _localPosition.y,
-      parentPos.z + _localPosition.z,
-    );
+  Vector3 worldPosition() nothrow {
+    Matrix wm = worldMatrix();
+    return Vector3(wm.m12, wm.m13, wm.m14);
   }
 
-  Quaternion worldRotation() const nothrow {
-    if (parent is null)
-      return _localRotation;
-    return QuaternionMultiply(parent.rotation, _localRotation);
+  Vector3 worldScale() nothrow {
+    Matrix wm = worldMatrix();
+    // Each basis column's length is the corresponding world scale axis.
+    float sx = Vector3Length(Vector3(wm.m0, wm.m1, wm.m2));
+    float sy = Vector3Length(Vector3(wm.m4, wm.m5, wm.m6));
+    float sz = Vector3Length(Vector3(wm.m8, wm.m9, wm.m10));
+    return Vector3(sx, sy, sz);
   }
 
-  Vector3 worldScale() const nothrow {
-    if (parent is null)
-      return _localScale;
-    auto ps = parent.scale;
-    return Vector3(
-      ps.x * _localScale.x,
-      ps.y * _localScale.y,
-      ps.z * _localScale.z,
-    );
+  Quaternion worldRotation() nothrow {
+    Matrix wm = worldMatrix();
+    // Strip scale so we hand a pure rotation matrix to QuaternionFromMatrix.
+    float sx = Vector3Length(Vector3(wm.m0, wm.m1, wm.m2));
+    float sy = Vector3Length(Vector3(wm.m4, wm.m5, wm.m6));
+    float sz = Vector3Length(Vector3(wm.m8, wm.m9, wm.m10));
+    Matrix rot = wm;
+    rot.m0  /= sx; rot.m1  /= sx; rot.m2  /= sx;
+    rot.m4  /= sy; rot.m5  /= sy; rot.m6  /= sy;
+    rot.m8  /= sz; rot.m9  /= sz; rot.m10 /= sz;
+    // Zero out translation so only the 3x3 rotation block remains.
+    rot.m12 = 0; rot.m13 = 0; rot.m14 = 0;
+    return QuaternionFromMatrix(rot);
   }
 }

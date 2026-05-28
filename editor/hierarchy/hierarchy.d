@@ -40,10 +40,12 @@ void DrawText(immutable(char*) text, int x, int y, int fs, Color color) { // mim
   DrawTextEx(font, text, Vector2(x, y), fsize, fspacing, color);
 }
 
-private bool removeFromHierarchy(ref GameObject[] arr, GameObject node) {
-  foreach (i, c; arr) {
+private bool removeFromHierarchy(ref GameObject[] roots, GameObject node) {
+  foreach (i, c; roots) {
     if (c is node) {
-      arr = arr[0 .. i] ~ arr[i + 1 .. $];
+      roots = roots[0 .. i] ~ roots[i + 1 .. $];
+      if (node.parent !is null)
+        node.parent.removeChild(node, true);
       return true;
     }
     if (removeFromHierarchy(c.children, node)) return true;
@@ -89,7 +91,7 @@ private void executeDrop(Scene scene) {
   final switch (g_drop.zone) {
   case DropInfo.Zone.Before: insertSibling(scene.roots, tgt, d, false); break;
   case DropInfo.Zone.After:  insertSibling(scene.roots, tgt, d, true);  break;
-  case DropInfo.Zone.Into:   tgt.children ~= d;                         break;
+  case DropInfo.Zone.Into:   tgt.addChild(d);                           break;
   }
 }
 

@@ -159,16 +159,16 @@ private Quaternion toQuat(JSONValue j) {
 }
 
 private JSONValue serializeTransform(ref const Transform t) {
-  return JSONValue(["position": serializeVec3(t.position),
-                    "rotation": serializeQuat(t.rotation),
-                    "scale":    serializeVec3(t.scale),
+  return JSONValue(["position": serializeVec3(t.localPosition),
+                    "rotation": serializeQuat(t.localRotation),
+                    "scale":    serializeVec3(t.localScale),
                     ]);
 }
 
 private void applyTransform(ref Transform t, JSONValue j) {
-  t.position = toVec3(j["position"]);
-  t.rotation = toQuat(j["rotation"]);
-  t.scale    = toVec3(j["scale"]);
+  t.localPosition = toVec3(j["position"]);
+  t.localRotation = toQuat(j["rotation"]);
+  t.localScale    = toVec3(j["scale"]);
 }
 
 

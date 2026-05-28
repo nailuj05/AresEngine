@@ -16,14 +16,22 @@ import engine.scripting.luascriptdef;
 class LuaScript : Component, IExtraSerializable {
   mixin Named!"LuaScript";
 
-  string scriptPath;
+  private string _scriptPath;
+
+  @property string scriptPath() { return _scriptPath; }
+  @property void scriptPath(string val) {
+    if (val == _scriptPath) return;
+    _scriptPath = val;
+    reload();
+  }
 
   // D-side value store
   LuaFieldValue[] fieldValues;
 
   private LuaScriptDef def;
-  private int          instanceRef = LUA_NOREF;
-  private bool         hasOnUpdate;
+  private int instanceRef = LUA_NOREF;
+  private bool hasOnUpdate;
+  private bool started;
 
   // Convenience: look up field index by name
   int fieldIndex(string name) {
@@ -35,11 +43,15 @@ class LuaScript : Component, IExtraSerializable {
 
   // --- Component Functions ---
   override void onStart() {
+    started = true;
     loadScript();
     callMethod("onStart", 0);
   }
 
-  override void onEditorStart() { loadScript(); }
+  override void onEditorStart() {
+    started = true;
+    loadScript();
+  }
 
   override void onUpdate(float dt) {
     if (!hasOnUpdate) return;
@@ -78,30 +90,48 @@ class LuaScript : Component, IExtraSerializable {
 
   JSONValue serializeExtra() {
     JSONValue obj = JSONValue((JSONValue[string]).init);
+    // scriptPath accessed directly to avoid triggering a unneeded reload
+    obj["scriptPath"] = JSONValue(_scriptPath);
     if (!def) return obj;
     foreach (i, ref d; def.fields)
       obj[d.name] = fieldValues[i].toJson();
     return obj;
   }
 
-  // load eagerly so nothing is lost when this is called in scene load before the component was started
   void deserializeExtra(JSONValue data) {
-    if (!def && scriptPath.length)
-      def = getOrLoadScriptDef(get_luaruntime(), scriptPath);
-    if (!def) return;
+    if (auto p = "scriptPath" in data.object)
+      _scriptPath = p.get!string; // direct assignment, no reload triggered
 
-    // always (re)size and fill with defaults first
+    if (_scriptPath.length) {
+      if (!def)
+        def = getOrLoadScriptDef(get_luaruntime(), _scriptPath);
+      if (!def) return;
+    }
+
     fieldValues.length = def.fields.length;
     foreach (i, ref d; def.fields)
       fieldValues[i] = LuaFieldValue.fromDef(d);
-
-    // overwrite with whatever was saved
     foreach (i, ref d; def.fields)
       if (auto p = d.name in data.object)
         fieldValues[i] = LuaFieldValue.fromJson(d.type, *p);
   }
 
   // --- Helpers ---
+  private void reload() {
+    import std.stdio;
+    def        = null;
+    fieldValues = null;
+    
+    if (!started) return; // deserialization path: do nothing
+    
+    if (instanceRef != LUA_NOREF) {
+        unloadScript();
+    }
+
+    if (_scriptPath.length)
+        loadScript();
+  }
+  
   private void loadScript() {
     auto L = get_luaruntime();
 
@@ -207,8 +237,15 @@ class LuaScript : Component, IExtraSerializable {
 
     private FieldState[string] fieldStates;
     private FieldState[] _fieldStates;
+    private FieldState _scriptPathState;
 
     override ulong drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {
+      string sp = _scriptPath;
+      drawField("scriptPath", sp, _scriptPathState, offsetX, offsetY, panelW);
+      scriptPath = sp;
+        
+      offsetY += 28;
+
       auto self = this;
       offsetY = drawFields(self, fieldStates, offsetX, offsetY, panelW);
       if (!def) return offsetY;

@@ -146,7 +146,10 @@ int main(string[] args) {
     return 1;
   }
   activeScene = loadScene(mainScene);
+  log("Scene: ", activeScene.name, " loaded");
+
   activeScene.editorStart();
+  log("Editor Start");
 
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();

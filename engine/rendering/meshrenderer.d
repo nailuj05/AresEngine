@@ -17,6 +17,12 @@ class MeshRenderer : Component {
   override void onStart() {
     mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
     mat = LoadMaterialDefault();
+
+    // TODO: Proper Materials, Shaders etc pp
+    auto ownMaps = cast(MaterialMap*)MemAlloc(cast(int)(MaterialMapIndex.max * MaterialMap.sizeof));
+    import core.stdc.string : memcpy;
+    memcpy(ownMaps, mat.maps, MaterialMapIndex.max * MaterialMap.sizeof);
+    mat.maps = ownMaps;
     mat.maps[MATERIAL_MAP_DIFFUSE].color = color;
   }
   
@@ -27,6 +33,7 @@ class MeshRenderer : Component {
 
   override void onDestroy() {
     UnloadMaterial(mat);
+    UnloadMesh(mesh);
   }
   
   version(Editor) {

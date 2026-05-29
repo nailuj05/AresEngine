@@ -62,6 +62,9 @@ class GameObject {
     foreach (c; components)
       if (c.enabled) c.onStart();
 
+    foreach (c; transform.children)
+      if (c.gameObject.active) c.gameObject.start();
+    
     started = true;
   }
 
@@ -92,6 +95,9 @@ class GameObject {
       foreach (c; components)
         if (c.enabled) c.onEditorStart();
       
+      foreach (c; transform.children)
+        if (c.gameObject.active) c.gameObject.editorStart();
+
       started = true;
     }
 

@@ -12,7 +12,7 @@ enum Axis {
 }
 
 class Transform {
-private:
+// private:
   Vector3    _localPosition = Vector3(0, 0, 0);
   Quaternion _localRotation = Quaternion(0, 0, 0, 1);
   Vector3    _localScale    = Vector3(1, 1, 1);
@@ -215,7 +215,7 @@ private:
     Matrix rotationMat = QuaternionToMatrix(_localRotation);
     Matrix scaleMat    = MatrixScale(_localScale.x, _localScale.y, _localScale.z);
 
-    // Correct TRS order: scale -> rotate -> translate
+    // S * R * T: scale, then rotate, then translate
     _localMatrix = MatrixMultiply(MatrixMultiply(scaleMat, rotationMat), translation);
     _localDirty  = false;
   }
@@ -229,7 +229,7 @@ private:
     if (parent is null) {
       _worldMatrix = _localMatrix;
     } else {
-      _worldMatrix = MatrixMultiply(parent.worldMatrix(), _localMatrix);
+      _worldMatrix = MatrixMultiply(_localMatrix, parent.worldMatrix());
     }
 
     _worldDirty = false;

@@ -24,29 +24,25 @@ template isSerializableField(T) {
 
 // public API
 
+
 void saveScene(Scene scene, string path) {
   JSONValue[] roots;
-  foreach(go; scene.roots)
-    roots ~= serializeGO(go);
-
+  foreach (t; scene.roots)
+    roots ~= serializeTransform(t);
   write(path, JSONValue(["name": JSONValue(scene.name), "roots": JSONValue(roots)]).toPrettyString());
 }
 
 Scene loadScene(string path) {
-  JSONValue jsonT;
+  JSONValue j;
   try {
-    jsonT = parseJSON(readText(path));
+    j = parseJSON(readText(path));
   } catch (Exception e) {
     writeln("Failure opening scene");
     return null;
   }
-
-  auto scene = new Scene(jsonT["name"].str);
-  
-  foreach (goJson; jsonT["roots"].array) {
-    scene.roots ~= deserializeGO(goJson);
-  }
-
+  auto scene = new Scene(j["name"].str);
+  foreach (rootJ; j["roots"].array)
+    scene.roots ~= deserializeTransform(rootJ);
   return scene;
 }
 
@@ -172,50 +168,56 @@ private void applyTransform(ref Transform t, JSONValue j) {
 }
 
 
-// gameobject
+// transform
 
-private JSONValue serializeGO(GameObject go) {
+private JSONValue serializeTransform(Transform t) {
+  JSONValue[] children;
+  foreach (child; t.children)
+    children ~= serializeTransform(child);
+
   JSONValue[] comps;
-  foreach (c; go.components)
+  foreach (c; t.gameObject.components)
     comps ~= serializeComponent(c);
 
-  JSONValue[] children;
-  foreach (child; go.children) {
-    children ~= serializeGO(child);
-  }
-
-  return JSONValue(["name":       JSONValue(go.name),
-                    "active":     JSONValue(go.active),
-                    "transform":  serializeTransform(go.transform),
+  return JSONValue(["name":       JSONValue(t.gameObject.name),
+                    "active":     JSONValue(t.gameObject.active),
+                    "position":   serializeVec3(t.localPosition),
+                    "rotation":   serializeQuat(t.localRotation),
+                    "scale":      serializeVec3(t.localScale),
                     "components": JSONValue(comps),
                     "children":   JSONValue(children),
                     ]);
 }
 
-private GameObject deserializeGO(JSONValue j) {
-  auto go   = new GameObject();
-  go.name   = j["name"].str;
-  go.active = j["active"].boolean;
-  applyTransform(go.transform, j["transform"]);
+private Transform deserializeTransform(JSONValue j, Transform parent = null) {
+  auto go       = new GameObject();
+  go.name       = j["name"].str;
+  go.active     = j["active"].boolean;
+  // go.transform is created by GameObject ctor, grab the reference
+  auto t        = go.transform;
+  t.localPosition = toVec3(j["position"]);
+  t.localRotation = toQuat(j["rotation"]);
+  t.localScale    = toVec3(j["scale"]);
 
-  foreach (cj; j["components"].array) {
+  if (parent !is null)
+    parent.addChild(t, false); // local coords already set, no world roundtrip
+
+  foreach (cj; j["components"].array)
     go.components ~= deserializeComponent(cj, go);
-  }
 
-  foreach (childJ; j["children"].array) {
-    auto child = deserializeGO(childJ);
-    go.children ~= child;
-  }
+  foreach (childJ; j["children"].array)
+    deserializeTransform(childJ, t);
 
-  return go;
+  return t;
 }
 
 // helpers
 
 private JSONValue serializeColor(Color c) {
-  return JSONValue(["r": JSONValue(c.r), "g": JSONValue(c.g), "b": JSONValue(c.b), "a": JSONValue(c.a)]);
+  return JSONValue(["r": JSONValue(c.r), "g": JSONValue(c.g),
+                    "b": JSONValue(c.b), "a": JSONValue(c.a)]);
 }
-  
+
 private Color toColor(JSONValue j) {
   return Color(cast(ubyte)j["r"].integer,
                cast(ubyte)j["g"].integer,

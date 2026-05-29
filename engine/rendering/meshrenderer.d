@@ -12,38 +12,32 @@ class MeshRenderer : Component {
   @DontSerialize Mesh mesh;
   Color color = Color(255, 0, 0);
   
-  string testString = "hi";
-  float testFloat = 67.6767f;
-  int testInt = 420;
-  bool testBool = false;
-  
-  private Model model;
+  private Material mat;
   
   override void onStart() {
     mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
-    model = LoadModelFromMesh(mesh);
+    mat = LoadMaterialDefault();
+    mat.maps[MATERIAL_MAP_DIFFUSE].color = color;
   }
   
   override void onDraw() {
-    model.transform = owner.transform.worldMatrix();
-  
-    DrawModel(model, Vector3.zero, 1.0f, color); 
+    mat.maps[MATERIAL_MAP_DIFFUSE].color = color;
+    DrawMesh(mesh, mat, owner.transform.worldMatrix()); 
   }
 
   override void onDestroy() {
-    UnloadModel(model);
+    UnloadMaterial(mat);
   }
   
   version(Editor) {
     import editor.inspector.drawer;
   
     override void onEditorStart() {
-      mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
-      model = LoadModelFromMesh(mesh);
+      onStart();
     }
 
     override void onEditorDestroy() {
-      UnloadModel(model);
+      onDestroy();
     }
     
     private FieldState[string] fieldStates;

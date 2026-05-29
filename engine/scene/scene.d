@@ -2,12 +2,13 @@ module engine.scene.scene;
 
 import std.algorithm.mutation : remove;
 
+import engine.core.transform;
 import engine.core.gameobject;
 import engine.rendering.camera;
 
 class Scene {
   string       name;
-  GameObject[] roots;
+  Transform[] roots;
   
   this(string name) {
     this.name = name;
@@ -16,7 +17,7 @@ class Scene {
   GameObject createObject(string goName = "GameObject") {
     auto go = new GameObject();
     go.name = goName;
-    roots  ~= go;
+    roots  ~= go.transform;
     return go;
   }
 
@@ -26,30 +27,30 @@ class Scene {
   }
 
   void start() {
-    foreach (go; roots)
-      go.start();
+    foreach (t; roots)
+      t.gameObject.start();
   }
 
   void update(float dt) {
-    foreach (go; roots)
-      if (go.active) go.update(dt);
+    foreach (t; roots)
+      if (t.gameObject.active) t.gameObject.update(dt);
   }
 
   void draw() {
-    foreach (go; roots)
-      if (go.active) go.draw();
+    foreach (t; roots)
+      if (t.gameObject.active) t.gameObject.draw();
   }
 
   void destroy() {
-    foreach (go; roots)
-      go.destroy();
+    foreach (t; roots)
+      t.gameObject.destroy();
 
     roots = [];
   }
 
   Camera getMainCamera() {
-    foreach (root; roots) {
-      Camera c = findMainCamera(root);
+    foreach (t; roots) {
+      Camera c = findMainCamera(t.gameObject);
       if (c !is null)
         return c;
     }
@@ -61,21 +62,21 @@ class Scene {
     if (c !is null)
       return c;
 
-    foreach (child; go.children) {
-      return findMainCamera(child);
+    foreach (child; go.transform.children) {
+      return findMainCamera(child.gameObject);
     }
     return null;
   }
 
   version(Editor) {
     void editorStart() {
-      foreach (go; roots)
-        go.editorStart();
+      foreach (t; roots)
+        t.gameObject.editorStart();
     }
 
     void editorDestroy() {
-      foreach (go; roots)
-        go.editorDestroy();
+      foreach (t; roots)
+        t.gameObject.editorDestroy();
 
       roots = [];
     }

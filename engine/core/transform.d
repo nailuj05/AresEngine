@@ -3,13 +3,15 @@ module engine.core.transform;
 import raylib : Matrix, Vector3, Quaternion;
 import raylib.raymath;
 
+import engine.core.gameobject;
+
 enum Axis {
   X = 0,
   Y = 1,
   Z = 2,
 }
 
-struct Transform {
+class Transform {
 private:
   Vector3    _localPosition = Vector3(0, 0, 0);
   Quaternion _localRotation = Quaternion(0, 0, 0, 1);
@@ -19,9 +21,63 @@ private:
   bool       _localDirty = true;
   bool       _worldDirty = true;
 
-  package Transform* parent = null;
-  
 public:
+  Transform parent;
+  Transform[] children;
+  GameObject gameObject;
+  
+  this(GameObject gameObject) {
+    this.gameObject = gameObject;
+  }
+
+  // Children
+
+  void addChild(Transform child, bool keepWorldPos = true) nothrow {
+    Vector3    wp = child.position;
+    Quaternion wr = child.rotation;
+    Vector3    ws = child.scale;
+    if (child.parent !is null)
+      child.parent.removeChild(child, false);
+    children     ~= child;
+    child.parent  = this;
+    // flush this node's world matrix BEFORE the setters walk up to it
+    cast(void) worldMatrix();
+    markWorldDirty();
+    if (keepWorldPos) {
+      child.position = wp;
+      child.rotation = wr;
+      child.scale    = ws;
+    }
+  }
+
+  void removeChild(Transform child, bool keepWorldPos = true) nothrow {
+    import std.algorithm : remove;
+
+    Vector3    wp = child.position;
+    Quaternion wr = child.rotation;
+    Vector3    ws = child.scale;
+
+    children                = children.remove!(c => c is child);
+    child.parent            = null;
+    markWorldDirty();
+
+    if (keepWorldPos) {
+      child.position = wp;
+      child.rotation = wr;
+      child.scale    = ws;
+    }
+  }
+
+  void setParent(Transform newParent, bool keepWorldPos = true) nothrow {
+    if (parent is newParent) return;
+    if (newParent !is null)
+      newParent.addChild(this, keepWorldPos);
+    else if (parent !is null)
+      parent.removeChild(this, keepWorldPos);
+  }
+  
+
+  // Transformation
 
   @property const(Vector3) localPosition() const nothrow {
     return _localPosition;
@@ -54,8 +110,7 @@ public:
     if (parent is null) {
       _localPosition = worldPos;
     } else {
-      // Bring worldPos into local space via the inverse of the parent's world matrix
-      Matrix invParent = MatrixInvert((cast(Transform*) parent).worldMatrix());
+      Matrix invParent = MatrixInvert(parent.worldMatrix());
       _localPosition   = Vector3Transform(worldPos, invParent);
     }
     markDirty();
@@ -84,11 +139,7 @@ public:
       // Use the inverse parent world matrix to derive local scale correctly,
       // even when the parent carries rotation or shear.
       auto parentScale = parent.scale;
-      _localScale = Vector3(
-                            ws.x / parentScale.x,
-                            ws.y / parentScale.y,
-                            ws.z / parentScale.z,
-                            );
+      _localScale = Vector3(ws.x / parentScale.x, ws.y / parentScale.y, ws.z / parentScale.z,);
     }
     markDirty();
   }
@@ -145,7 +196,14 @@ package:
 
   // Mark only the world matrix dirty and propagate to children.
   void markWorldDirty() nothrow {
+    if (_worldDirty)
+      return;
+
     _worldDirty = true;
+
+    foreach (child; children) {
+      child.markWorldDirty();
+    }
   }
 
 private:

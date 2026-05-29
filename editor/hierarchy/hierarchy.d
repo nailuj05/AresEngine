@@ -6,6 +6,7 @@ import raylib;
 import raygui;
 
 import engine.scene.scene;
+import engine.core.transform : Transform;
 import engine.core.gameobject;
 
 import editor.style;
@@ -40,32 +41,34 @@ void DrawText(immutable(char*) text, int x, int y, int fs, Color color) { // mim
   DrawTextEx(font, text, Vector2(x, y), fsize, fspacing, color);
 }
 
-private bool removeFromHierarchy(ref GameObject[] roots, GameObject node) {
-  foreach (i, c; roots) {
-    if (c is node) {
+bool removeFromHierarchy(ref Transform[] roots, Transform node) {
+  for (size_t i = 0; i < roots.length; i++) {
+    if (roots[i] is node) {
       roots = roots[0 .. i] ~ roots[i + 1 .. $];
       if (node.parent !is null)
-        node.parent.removeChild(node, true);
+        node.parent.removeChild(node);
       return true;
     }
-    if (removeFromHierarchy(c.children, node)) return true;
+    if (removeFromHierarchy(roots[i].children, node))
+      return true;
   }
   return false;
 }
 
-private bool insertSibling(ref GameObject[] arr, GameObject target, GameObject node, bool after) {
-  foreach (i, c; arr) {
-    if (c is target) {
+private bool insertSibling(ref Transform[] arr, Transform target, Transform node, bool after) {
+  for (size_t i = 0; i < arr.length; i++) {
+    if (arr[i] is target) {
       size_t at = after ? i + 1 : i;
-      arr = arr[0 .. at] ~ node ~ arr[at .. $];
+      arr = arr[0 .. at] ~ [node] ~ arr[at .. $];
       return true;
     }
-    if (insertSibling(c.children, target, node, after)) return true;
+    if (insertSibling(arr[i].children, target, node, after))
+      return true;
   }
   return false;
 }
 
-private bool isDescendant(GameObject ancestor, GameObject test) {
+private bool isDescendant(Transform ancestor, Transform test) {
   foreach (c; ancestor.children) {
     if (c is test || isDescendant(c, test)) return true;
   }
@@ -79,23 +82,22 @@ private void executeDrop(Scene scene) {
 
   // dropped on empty space = detach to root
   if (!g_drop.valid) {
-    removeFromHierarchy(scene.roots, d);
-    scene.roots ~= d;
+    removeFromHierarchy(scene.roots, d.transform);
+    scene.roots ~= d.transform;
     return;
   }
 
   auto tgt = g_drop.target;
-  if (tgt is d || isDescendant(d, tgt)) return; // dont drop on self or own children
+  if (tgt is d || isDescendant(d.transform, tgt.transform)) return; // dont drop on self or own children
 
-  removeFromHierarchy(scene.roots, d);
+  removeFromHierarchy(scene.roots, d.transform);
+  import std.stdio;
   final switch (g_drop.zone) {
-  case DropInfo.Zone.Before: insertSibling(scene.roots, tgt, d, false); break;
-  case DropInfo.Zone.After:  insertSibling(scene.roots, tgt, d, true);  break;
-  case DropInfo.Zone.Into:   tgt.addChild(d);                           break;
+  case DropInfo.Zone.Before: insertSibling(scene.roots, tgt.transform, d.transform, false); break;
+  case DropInfo.Zone.After:  insertSibling(scene.roots, tgt.transform, d.transform, true);  break;
+  case DropInfo.Zone.Into:   tgt.transform.addChild(d.transform); break;
   }
 }
-
-
 
 void drawHierarchy(Rectangle r, Scene activeScene, ref GameObject selected) {
   DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
@@ -113,7 +115,7 @@ void drawHierarchy(Rectangle r, Scene activeScene, ref GameObject selected) {
 
   int y = cast(int)r.y + 28;
   foreach (go; activeScene.roots)
-    y = drawGameObject(cast(int)r.x + PAD, y, cast(int)r.width, go, selected);
+    y = drawGameObject(cast(int)r.x + PAD, y, cast(int)r.width, go.gameObject, selected);
 
   // floating label
   if (g_dragActive && g_dragging !is null) {
@@ -129,7 +131,7 @@ void drawHierarchy(Rectangle r, Scene activeScene, ref GameObject selected) {
 }
 
 private int drawGameObject(int ox, int oy, int width, GameObject current, ref GameObject selected) {
-  bool hasChildren = current.children.length > 0;
+  bool hasChildren = current.transform.children.length > 0;
   auto rowRect = Rectangle(ox + HEIGHT, oy, width - ox - PAD - HEIGHT, HEIGHT);
   auto arrowRect = Rectangle(ox, oy, HEIGHT, HEIGHT);
 
@@ -190,8 +192,8 @@ private int drawGameObject(int ox, int oy, int width, GameObject current, ref Ga
     int childY = oy + HEIGHT + PAD;
 
     if (current.expanded) {
-      foreach (c; current.children) {
-        childY = drawGameObject(ox + INSET, childY, width, c, selected);
+      foreach (c; current.transform.children) {
+        childY = drawGameObject(ox + INSET, childY, width, c.gameObject, selected);
       }
     }
 

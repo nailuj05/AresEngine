@@ -10,8 +10,6 @@ class GameObject {
   bool         active = true;
   Transform    transform;
   Component[]  components;
-  GameObject   parent;
-  GameObject[] children;
 
   private bool started = false;
   
@@ -23,6 +21,10 @@ class GameObject {
     FieldState[3] scaleFS;
 
     bool expanded = true;
+  }
+
+  this() {
+    transform = new Transform(this);
   }
     
   T addComponent(T : Component)() {
@@ -56,66 +58,6 @@ class GameObject {
     components = components.remove(idx);
   }
 
-  void addChild(GameObject child, bool keepWorldPos = true) nothrow {
-    Vector3    wp = child.transform.position;
-    Quaternion wr = child.transform.rotation;
-    Vector3    ws = child.transform.scale;
-
-    if (child.parent !is null)
-      child.parent.removeChild(child, false);
-
-    children          ~= child;
-    child.parent       = this;
-    child.transform.parent = &transform;  // only pointer, no _children bookkeeping
-    _propagateDirty(child);
-
-    if (keepWorldPos) {
-      child.transform.position = wp;
-      child.transform.rotation = wr;
-      child.transform.scale    = ws;
-    }
-  }
-
-  void removeChild(GameObject child, bool keepWorldPos = true) nothrow {
-    import std.algorithm : remove;
-
-    Vector3    wp = child.transform.position;
-    Quaternion wr = child.transform.rotation;
-    Vector3    ws = child.transform.scale;
-
-    children                = children.remove!(c => c is child);
-    child.parent            = null;
-    child.transform.parent  = null;
-    _propagateDirty(child);
-
-    if (keepWorldPos) {
-      child.transform.position = wp;
-      child.transform.rotation = wr;
-      child.transform.scale    = ws;
-    }
-  }
-
-  void setParent(GameObject newParent, bool keepWorldPos = true) nothrow {
-    if (parent is newParent) return;
-    if (newParent !is null)
-      newParent.addChild(this, keepWorldPos);
-    else if (parent !is null)
-      parent.removeChild(this, keepWorldPos);
-  }
-
-  void detachChildren(bool keepWorldPos = true) nothrow {
-    auto snap = children.dup;
-    foreach (c; snap)
-      removeChild(c, keepWorldPos);
-  }
-
-  // walk the GO tree to propagate world dirty downward
-  private static void _propagateDirty(GameObject node) nothrow {
-    node.transform.markWorldDirty();
-    foreach (c; node.children)
-      _propagateDirty(c);
-  }
-
   void start() {
     foreach (c; components)
       if (c.enabled) c.onStart();
@@ -133,16 +75,16 @@ class GameObject {
     foreach (c; components)
       if (c.enabled) c.onDraw();
 
-    foreach (c; children)
-      if (c.active) c.draw();
+    foreach (c; transform.children)
+      if (c.gameObject.active) c.gameObject.draw();
   }
 
   void destroy() {
     foreach (c; components)
       c.onDestroy();
 
-    foreach (go; children)
-      go.destroy();
+    foreach (c; transform.children)
+      c.gameObject.destroy();
   }
 
   version(Editor) {
@@ -157,8 +99,8 @@ class GameObject {
       foreach (c; components)
         c.onEditorDestroy();
       
-      foreach (go; children)
-        go.editorDestroy();
+      foreach (c; transform.children)
+        c.gameObject.editorDestroy();
     }
   }
 }

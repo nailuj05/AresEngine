@@ -1,7 +1,7 @@
 module engine.scene.loader;
 
 import std.json;
-import std.stdio  : writeln;
+import std.stdio;
 import std.file   : readText, write;
 import std.traits : FieldNameTuple, Unqual, hasUDA;
 
@@ -26,6 +26,7 @@ template isSerializableField(T) {
 
 
 void saveScene(Scene scene, string path) {
+  writefln("saving scene %s", scene.name);
   JSONValue[] roots;
   foreach (t; scene.roots)
     roots ~= serializeTransform(t);
@@ -33,6 +34,7 @@ void saveScene(Scene scene, string path) {
 }
 
 Scene loadScene(string path) {
+  writefln("loading scene %s", path);
   JSONValue j;
   try {
     j = parseJSON(readText(path));
@@ -65,6 +67,7 @@ private JSONValue serializeFields(T)(T obj) {
         else static if (is(FT == string))  result[field] = JSONValue(v);
         else static if (is(FT == Color))   result[field] = serializeColor(v);
         else static if (is(FT == enum))    result[field] = JSONValue(cast(long)v);
+        else static if (is(FT == Vector3)) result[field] = serializeVec3(v);
       }
     }
   }
@@ -89,6 +92,7 @@ private void deserializeFields(T)(T obj, JSONValue fields) {
           else static if (is(FT == string)) __traits(getMember, obj, field) = jv.str;
           else static if (is(FT == Color))  __traits(getMember, obj, field) = toColor(jv);
           else static if (is(FT == enum))   __traits(getMember, obj, field) = cast(FT)jv.integer;
+          else static if (is(FT == Vector3))__traits(getMember, obj, field) = toVec3(jv);
         }
       }
     }

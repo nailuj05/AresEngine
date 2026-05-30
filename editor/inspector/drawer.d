@@ -102,6 +102,10 @@ bool drawEulerField(string label, ref Quaternion q, ref FieldState[3] fs, float 
   return true;
 }
 
+void drawField(string label, ref Vector3 value, ref FieldState[3] state, float ox, float oy, float pw, void delegate()* deferred = null) {
+    drawVec3Field(label, value, state, ox, oy, pw);
+}
+
 void drawField(T)(string label, ref T value, ref FieldState state, float ox, float oy, float pw, void delegate()* deferred = null) {
   syncBuffer(state, value);
   Rectangle lr = Rectangle(ox + 8, oy, LABEL_W, FIELD_H);
@@ -124,7 +128,7 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
       state.editing = !state.editing;
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
-  } static if (is(T == Color)) {
+  } else static if (is(T == Color)) {
     DrawRectangleRec(fr, value);
     DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
 
@@ -161,8 +165,26 @@ ulong drawFields(T)(ref T obj, ref FieldState[string] states, ulong ox, ulong oy
   foreach (i, ref field; obj.tupleof) {
     static if (__traits(getProtection, obj.tupleof[i]) == "public" && !hasUDA!(obj.tupleof[i], DontSerialize)) {
       enum name = __traits(identifier, obj.tupleof[i]);
-      if (name !in states) states[name] = FieldState.init;
-      drawField(name, field, states[name], cast(float)ox, y, cast(float)pw, &deferred);
+      alias FieldType = typeof(field);
+
+      // subkeying isnt optimal, but at least it is done at compile time so no overhead
+      static if (is(FieldType == Vector3)) {
+        enum kx = name ~ ".x";
+        enum ky = name ~ ".y";
+        enum kz = name ~ ".z";
+        if (kx !in states) states[kx] = FieldState.init;
+        if (ky !in states) states[ky] = FieldState.init;
+        if (kz !in states) states[kz] = FieldState.init;
+        FieldState[3] fs = [states[kx], states[ky], states[kz]];
+        drawField(name, field, fs, cast(float)ox, y, cast(float)pw);
+        states[kx] = fs[0];
+        states[ky] = fs[1];
+        states[kz] = fs[2];
+      } else {
+        if (name !in states) states[name] = FieldState.init;
+        drawField(name, field, states[name], cast(float)ox, y, cast(float)pw, &deferred);
+      }
+
       y += ROW_H;
     }
   }

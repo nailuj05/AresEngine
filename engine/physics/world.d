@@ -3,6 +3,7 @@ module engine.physics.world;
 import std.stdio;
 import std.math : abs;
 import std.algorithm : max, sort, remove;
+import std.datetime.stopwatch : StopWatch;
 
 import raylib : Vector3, Quaternion, Matrix;
 import raylib.raymath;
@@ -15,6 +16,19 @@ import engine.physics.aabb : AABB;
 import engine.physics.boxcollider;
 import engine.physics.spherecollider;
 
+struct PhysicsProfile {
+    long integrateUs;
+    long broadphaseUs;
+    long narrowphaseUs;
+    long solverUs;
+    long correctionUs;
+    int  pairsAfterBroad;
+    int  pairsAfterNarrow;
+    int  totalContacts;
+}
+
+PhysicsProfile lastProfile;
+
 struct ContactPair {
   Collider        a, b;
   ContactManifold manifold;
@@ -23,18 +37,20 @@ struct ContactPair {
 // General TODO: use overloaded operators instead of raylib functions for vectors for readability (partially done already but should be consistent)
 
 // TODO: also part of manifest?
-enum float BAUMGARTE = 0.3f;
+enum float BAUMGARTE = 0.5f;
 enum float SLOP      = 0.001f;
 
 class PhysicsWorld {
   // TODO: make part of the manifest and project settings
-  int solverIterations = 1; 
-  float   fixedDt      = 1.0f / 50.0f;
+  int solverIterations = 2; 
+  float   fixedDt      = 1.0f / 60.0f;
   float   sleepVelocity = 0.05f;
   int     sleepFrames  = 90;
   Axis    broadphaseAxis = Axis.X;
   Vector3 gravity        = Vector3(0, -9.81f, 0);
  
+  PhysicsProfile lastProfile;
+  
   Rigidbody[] bodies;
   Collider[]  colliders;
  
@@ -58,13 +74,38 @@ private:
   ContactPair[] _previousContacts;
  
   void fixedStep() {
+    StopWatch sw;
+
+    sw.reset(); sw.start();
     integrate(fixedDt);
+    lastProfile.integrateUs = sw.peek.total!"usecs";
+
+    sw.reset(); sw.start();
     auto pairs = broadphase();
+    lastProfile.broadphaseUs     = sw.peek.total!"usecs";
+    lastProfile.pairsAfterBroad  = cast(int)pairs.length;
+
+    sw.reset(); sw.start();
     narrowphase(pairs);
+    lastProfile.narrowphaseUs    = sw.peek.total!"usecs";
+    lastProfile.pairsAfterNarrow = cast(int)pairs.length;
+    lastProfile.totalContacts    = 0;
+    foreach (ref p; pairs) lastProfile.totalContacts += p.manifold.count;
+
+    foreach (rb; bodies)  // cache after integrate, before any resolve
+        if (!rb.isSleeping && !rb.isKinematic)
+            rb.cacheStepData();
+ 
+    sw.reset(); sw.start();
     foreach (_; 0 .. solverIterations)
       foreach (ref p; pairs)
         resolve(p);
+    lastProfile.solverUs = sw.peek.total!"usecs";
+
+    sw.reset(); sw.start();
     correctPositions(pairs);
+    lastProfile.correctionUs = sw.peek.total!"usecs";
+
     fireCallbacks(pairs);
     _previousContacts = pairs;
     updateSleeping();
@@ -103,7 +144,7 @@ private:
 
   ContactPair[] broadphase() {
     // Build (AABB, collider) pairs and sort by min on broadphaseAxis
-    struct Entry { float min, max; Collider c; }
+    struct Entry { float min, max; Collider c; AABB aabb; }
     Entry[] entries;
     entries.reserve(colliders.length);
     foreach (c; colliders) {
@@ -114,7 +155,7 @@ private:
       case Axis.Y: mn = b.min.y; mx = b.max.y; break;
       case Axis.Z: mn = b.min.z; mx = b.max.z; break;
       }
-      entries ~= Entry(mn, mx, c);
+      entries ~= Entry(mn, mx, c, b);
     }
 
     void insertionSort(Entry)(Entry[] arr) {
@@ -130,18 +171,22 @@ private:
     }
 
     insertionSort(entries);
- 
+    
+    bool aabbOverlap(AABB a, AABB b) {
+      return a.max.x >= b.min.x && a.min.x <= b.max.x
+        && a.max.y >= b.min.y && a.min.y <= b.max.y
+        && a.max.z >= b.min.z && a.min.z <= b.max.z;
+    }
+
     // Sweep: emit candidate pairs while intervals overlap on sort axis
     ContactPair[] pairs;
     foreach (i; 0 .. entries.length) {
       foreach (j; i + 1 .. entries.length) {
-        if (entries[j].min > entries[i].max) break; // no further overlap possible
- 
+        if (entries[j].min > entries[i].max) break;
         auto ca = entries[i].c;
         auto cb = entries[j].c;
-        // Skip two statics (no rigidbody on either side)
         if (ca.attachedRigidbody is null && cb.attachedRigidbody is null) continue;
- 
+        if (!aabbOverlap(entries[i].aabb, entries[j].aabb)) continue; // <--
         pairs ~= ContactPair(ca, cb);
       }
     }
@@ -205,7 +250,7 @@ private:
       : Vector3(0, 0, 0);
 
     float velAlongNormal = Vector3DotProduct(Vector3Subtract(vB, vA), n);
-    if (velAlongNormal > 0) return;
+    if (velAlongNormal > -0.001f && c.depth < SLOP) return;
 
     float restitution = velAlongNormal > -0.5f ? 0.0f
       : (ra !is null && rb !is null) ? (ra.restitution + rb.restitution) * 0.5f

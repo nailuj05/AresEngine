@@ -20,6 +20,8 @@ struct ContactPair {
   ContactManifold manifold;
 }
 
+// General TODO: use overloaded operators instead of raylib functions for vectors for readability (partially done already but should be consistent)
+
 // TODO: also part of manifest?
 enum float BAUMGARTE = 0.3f;
 enum float SLOP      = 0.001f;
@@ -253,7 +255,7 @@ private:
       ? Vector3Scale(tangent, jt)
       : Vector3Scale(tangent, -j * mu);
 
-    // TODO figure out the angular sliding
+    // TODO: figure out the angular sliding
     float tangentSpeed = Vector3DotProduct(rv, tangent);
     if (abs(tangentSpeed) < 0.01f)
       return;

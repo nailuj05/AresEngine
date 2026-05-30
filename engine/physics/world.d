@@ -8,6 +8,7 @@ import std.datetime.stopwatch : StopWatch;
 import raylib : Vector3, Quaternion, Matrix;
 import raylib.raymath;
 
+import engine.profiler;
 import engine.core.transform : Axis;
 import engine.physics.collider;
 import engine.physics.rigidbody;
@@ -42,7 +43,7 @@ enum float SLOP      = 0.001f;
 
 class PhysicsWorld {
   // TODO: make part of the manifest and project settings
-  int solverIterations = 2; 
+  int solverIterations = 3; 
   float   fixedDt      = 1.0f / 60.0f;
   float   sleepVelocity = 0.05f;
   int     sleepFrames  = 90;
@@ -74,37 +75,40 @@ private:
   ContactPair[] _previousContacts;
  
   void fixedStep() {
-    StopWatch sw;
+    Profiler p;
 
-    sw.reset(); sw.start();
+    p.start();
     integrate(fixedDt);
-    lastProfile.integrateUs = sw.peek.total!"usecs";
+    lastProfile.integrateUs = p.stop();
 
-    sw.reset(); sw.start();
+    p.start();
     auto pairs = broadphase();
-    lastProfile.broadphaseUs     = sw.peek.total!"usecs";
-    lastProfile.pairsAfterBroad  = cast(int)pairs.length;
+    lastProfile.broadphaseUs = p.stop();
+    lastProfile.pairsAfterBroad = cast(int)pairs.length;
 
-    sw.reset(); sw.start();
+    p.start();
     narrowphase(pairs);
-    lastProfile.narrowphaseUs    = sw.peek.total!"usecs";
-    lastProfile.pairsAfterNarrow = cast(int)pairs.length;
-    lastProfile.totalContacts    = 0;
-    foreach (ref p; pairs) lastProfile.totalContacts += p.manifold.count;
+    lastProfile.narrowphaseUs = p.stop();
+    version(Profile) {
+      lastProfile.pairsAfterNarrow = cast(int)pairs.length;
+      lastProfile.totalContacts = 0;
+      foreach (ref pa; pairs)
+        lastProfile.totalContacts += pa.manifold.count;
+    }
 
-    foreach (rb; bodies)  // cache after integrate, before any resolve
+    foreach (rb; bodies)
         if (!rb.isSleeping && !rb.isKinematic)
             rb.cacheStepData();
- 
-    sw.reset(); sw.start();
-    foreach (_; 0 .. solverIterations)
-      foreach (ref p; pairs)
-        resolve(p);
-    lastProfile.solverUs = sw.peek.total!"usecs";
 
-    sw.reset(); sw.start();
+    p.start();
+    foreach (_; 0 .. solverIterations)
+        foreach (ref pr; pairs)
+            resolve(pr);
+    lastProfile.solverUs = p.stop();
+
+    p.start();
     correctPositions(pairs);
-    lastProfile.correctionUs = sw.peek.total!"usecs";
+    lastProfile.correctionUs = p.stop();
 
     fireCallbacks(pairs);
     _previousContacts = pairs;

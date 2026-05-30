@@ -170,17 +170,9 @@ public:
     markDirty();
   }
 
-  @property Vector3 forward() nothrow {
-    return Vector3Normalize(Vector3RotateByQuaternion(Vector3(0, 0, 1), rotation));
-  }
-
-  @property Vector3 up() nothrow {
-    return Vector3Normalize(Vector3RotateByQuaternion(Vector3(0, 1, 0), rotation));
-  }
-
-  @property Vector3 right() nothrow {
-    return Vector3Normalize(Vector3RotateByQuaternion(Vector3(1, 0, 0), rotation));
-  }
+  @property Vector3 forward() nothrow { return Vector3RotateByQuaternion(Vector3(0,0,1), rotation); }
+  @property Vector3 up()      nothrow { return Vector3RotateByQuaternion(Vector3(0,1,0), rotation); }
+  @property Vector3 right()   nothrow { return Vector3RotateByQuaternion(Vector3(1,0,0), rotation); }
 
   
   Matrix localMatrix() nothrow {
@@ -203,19 +195,25 @@ public:
 
   // direction conversion: rotation only, no translation or scale
   Vector3 transformDirection(Vector3 localDir) nothrow {
-    return Vector3RotateByQuaternion(localDir, rotation());
+    return Vector3RotateByQuaternion(localDir, rotation);
   }
   Vector3 inverseTransformDirection(Vector3 worldDir) nothrow {
-    return Vector3RotateByQuaternion(worldDir, QuaternionInvert(rotation()));
+    return Vector3RotateByQuaternion(worldDir, QuaternionInvert(rotation));
   }
 
+  private bool _invWorldDirty;
+  private Matrix _cachedInvWorld;
   @property Matrix worldToLocalMatrix() nothrow {
-    return MatrixInvert(worldMatrix());
+    if (!_invWorldDirty) return _cachedInvWorld;
+    _cachedInvWorld = MatrixInvert(worldMatrix());
+    _invWorldDirty  = false;
+    return _cachedInvWorld;
   }
 
 
 package:
   void markDirty() nothrow {
+    if (_localDirty && _worldDirty) return;
     _localDirty = true;
     markWorldDirty();
   }
@@ -246,47 +244,44 @@ private:
     _localDirty  = false;
   }
 
+  private Vector3 _cachedPosition;
+  private Quaternion _cachedRotation;
+  private Vector3 _cachedScale;
   void updateWorldMatrix() nothrow {
-    if (!_worldDirty)
-      return;
-
+    if (!_worldDirty) return;
     updateLocalMatrix();
-
-    if (parent is null) {
-      _worldMatrix = _localMatrix;
-    } else {
-      _worldMatrix = MatrixMultiply(_localMatrix, parent.worldMatrix());
-    }
-
+    _worldMatrix = (parent is null) ? _localMatrix
+      : MatrixMultiply(_localMatrix, parent.worldMatrix());
     _worldDirty = false;
+
+    // Decompose everything now while we have the matrix hot
+    _cachedPosition = Vector3(_worldMatrix.m12, _worldMatrix.m13, _worldMatrix.m14);
+
+    float sx = Vector3Length(Vector3(_worldMatrix.m0, _worldMatrix.m1, _worldMatrix.m2));
+    float sy = Vector3Length(Vector3(_worldMatrix.m4, _worldMatrix.m5, _worldMatrix.m6));
+    float sz = Vector3Length(Vector3(_worldMatrix.m8, _worldMatrix.m9, _worldMatrix.m10));
+    _cachedScale = Vector3(sx, sy, sz);
+
+    Matrix rot = _worldMatrix;
+    rot.m0 /= sx; rot.m1 /= sx; rot.m2 /= sx;
+    rot.m4 /= sy; rot.m5 /= sy; rot.m6 /= sy;
+    rot.m8 /= sz; rot.m9 /= sz; rot.m10 /= sz;
+    rot.m12 = 0; rot.m13 = 0; rot.m14 = 0;
+    _cachedRotation = QuaternionFromMatrix(rot);
   }
 
   Vector3 worldPosition() nothrow {
-    Matrix wm = worldMatrix();
-    return Vector3(wm.m12, wm.m13, wm.m14);
+    updateWorldMatrix(); // ensures _cachedPosition is fresh
+    return _cachedPosition;
   }
 
   Vector3 worldScale() nothrow {
-    Matrix wm = worldMatrix();
-    // Each basis column's length is the corresponding world scale axis.
-    float sx = Vector3Length(Vector3(wm.m0, wm.m1, wm.m2));
-    float sy = Vector3Length(Vector3(wm.m4, wm.m5, wm.m6));
-    float sz = Vector3Length(Vector3(wm.m8, wm.m9, wm.m10));
-    return Vector3(sx, sy, sz);
+    updateWorldMatrix();
+    return _cachedScale;
   }
 
   Quaternion worldRotation() nothrow {
-    Matrix wm = worldMatrix();
-    // Strip scale so we hand a pure rotation matrix to QuaternionFromMatrix.
-    float sx = Vector3Length(Vector3(wm.m0, wm.m1, wm.m2));
-    float sy = Vector3Length(Vector3(wm.m4, wm.m5, wm.m6));
-    float sz = Vector3Length(Vector3(wm.m8, wm.m9, wm.m10));
-    Matrix rot = wm;
-    rot.m0  /= sx; rot.m1  /= sx; rot.m2  /= sx;
-    rot.m4  /= sy; rot.m5  /= sy; rot.m6  /= sy;
-    rot.m8  /= sz; rot.m9  /= sz; rot.m10 /= sz;
-    // Zero out translation so only the 3x3 rotation block remains.
-    rot.m12 = 0; rot.m13 = 0; rot.m14 = 0;
-    return QuaternionFromMatrix(rot);
+    updateWorldMatrix();
+    return _cachedRotation;
   }
 }

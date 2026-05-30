@@ -9,7 +9,11 @@ import engine.rendering.meshrenderer: MeshRenderer;
 import engine.scripting.luascript : LuaScript;
 import engine.rendering.camera : Camera;
 import engine.oscillator : Oscillator;
-alias KnownComponents = AliasSeq!(Camera, LuaScript, Oscillator, MeshRenderer);
+import engine.physics.collider : BoxCollider, CapsuleCollider, SphereCollider;
+import engine.physics.rigidbody : Rigidbody;
+
+//alias KnownComponents = AliasSeq!(BoxCollider, Camera, CapsuleCollider, LuaScript, MeshRenderer, Oscillator, Rigidbody, SphereCollider);
+alias KnownComponents = AliasSeq!(Camera, LuaScript, MeshRenderer, Oscillator);
 
 // @DontSerialize Field
 struct DontSerialize {}

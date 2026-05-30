@@ -74,7 +74,6 @@ class GameObject {
   }
 
   void draw() {
-    // draw ctx?
     foreach (c; components)
       if (c.enabled) c.onDraw();
 

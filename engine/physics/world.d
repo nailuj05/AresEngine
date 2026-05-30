@@ -28,6 +28,7 @@ enum float SLOP      = 0.001f;
 
 class PhysicsWorld {
   // TODO: make part of the manifest and project settings
+  int solverIterations = 1; 
   float   fixedDt      = 1.0f / 50.0f;
   float   sleepVelocity = 0.05f;
   int     sleepFrames  = 90;
@@ -60,8 +61,10 @@ private:
     integrate(fixedDt);
     auto pairs = broadphase();
     narrowphase(pairs);
-    foreach (ref p; pairs)
-      resolve(p);
+    foreach (_; 0 .. solverIterations)
+      foreach (ref p; pairs)
+        resolve(p);
+    correctPositions(pairs);
     fireCallbacks(pairs);
     _previousContacts = pairs;
     updateSleeping();
@@ -113,7 +116,20 @@ private:
       }
       entries ~= Entry(mn, mx, c);
     }
-    entries.sort!((a, b) => a.min < b.min);
+
+    void insertionSort(Entry)(Entry[] arr) {
+      foreach (i; 1 .. arr.length) {
+        auto key = arr[i];
+        long j   = cast(long)i - 1;
+        while (j >= 0 && arr[j].min > key.min) {
+          arr[j + 1] = arr[j];
+          j--;
+        }
+        arr[j + 1] = key;
+      }
+    }
+
+    insertionSort(entries);
  
     // Sweep: emit candidate pairs while intervals overlap on sort axis
     ContactPair[] pairs;
@@ -149,19 +165,13 @@ private:
     Rigidbody ra = p.a.attachedRigidbody;
     Rigidbody rb = p.b.attachedRigidbody;
     if (ra is null && rb is null) return;
-
     float invMassA = (ra !is null && !ra.isKinematic) ? 1.0f / ra.mass : 0.0f;
     float invMassB = (rb !is null && !rb.isKinematic) ? 1.0f / rb.mass : 0.0f;
-
     foreach (ci; 0 .. p.manifold.count)
       resolveContact(ra, rb, invMassA, invMassB, p.manifold.contacts[ci], p.manifold.count);
   }
 
-  void resolveContact(
-                      Rigidbody ra, Rigidbody rb,
-                      float invMassA, float invMassB,
-                      ref ContactInfo c, int manifoldCount)
-  {
+  void resolveContact(Rigidbody ra, Rigidbody rb, float invMassA, float invMassB, ref ContactInfo c, int manifoldCount) {
     import std.math : isNaN;
     if (isNaN(c.normal.x) || isNaN(c.depth) || c.depth < 1e-10f) return;
 
@@ -195,33 +205,27 @@ private:
       : Vector3(0, 0, 0);
 
     float velAlongNormal = Vector3DotProduct(Vector3Subtract(vB, vA), n);
-
-    // Divide by manifoldCount so N contacts don't apply N times the correction
-    float baumgarteVel = max(c.depth - SLOP, 0.0f) * BAUMGARTE / (fixedDt * manifoldCount);
-    float closingVel   = velAlongNormal - baumgarteVel;
-    if (closingVel > 0) return;
+    if (velAlongNormal > 0) return;
 
     float restitution = velAlongNormal > -0.5f ? 0.0f
       : (ra !is null && rb !is null) ? (ra.restitution + rb.restitution) * 0.5f
       : 0.0f;
 
-    float   j       = -(1.0f + restitution) * closingVel / invMassSum;
+    float   j       = -(1.0f + restitution) * velAlongNormal / invMassSum;
     Vector3 impulse = Vector3Scale(n, j);
 
     if (ra !is null && !ra.isKinematic) {
       ra.velocity        = Vector3Subtract(ra.velocity, Vector3Scale(impulse, invMassA));
-      ra.angularVelocity = Vector3Subtract(ra.angularVelocity,
-                                           ra.applyInverseInertia(Vector3CrossProduct(rA, impulse)));
+      ra.angularVelocity = Vector3Subtract(ra.angularVelocity, ra.applyInverseInertia(Vector3CrossProduct(rA, impulse)));
       ra.wakeUp();
     }
     if (rb !is null && !rb.isKinematic) {
       rb.velocity        = Vector3Add(rb.velocity, Vector3Scale(impulse, invMassB));
-      rb.angularVelocity = Vector3Add(rb.angularVelocity,
-                                      rb.applyInverseInertia(Vector3CrossProduct(rB, impulse)));
+      rb.angularVelocity = Vector3Add(rb.angularVelocity, rb.applyInverseInertia(Vector3CrossProduct(rB, impulse)));
       rb.wakeUp();
     }
 
-    // Friction (re-read velocities after normal impulse)
+    // Friction
     vA = ra !is null
       ? Vector3Add(ra.velocity, Vector3CrossProduct(ra.angularVelocity, rA))
       : Vector3(0, 0, 0);
@@ -254,11 +258,6 @@ private:
     Vector3 fi = abs(jt) < j * mu
       ? Vector3Scale(tangent, jt)
       : Vector3Scale(tangent, -j * mu);
-
-    // TODO: figure out the angular sliding
-    float tangentSpeed = Vector3DotProduct(rv, tangent);
-    if (abs(tangentSpeed) < 0.01f)
-      return;
  
     if (ra !is null && !ra.isKinematic) {
       ra.velocity        = Vector3Subtract(ra.velocity, Vector3Scale(fi, invMassA));
@@ -270,6 +269,33 @@ private:
     }
   }
  
+  // Linear position projection; no velocity side-effects
+  void correctPositions(ref ContactPair[] pairs) {
+    foreach (ref p; pairs) {
+      if (p.a.isTrigger || p.b.isTrigger) continue;
+      Rigidbody ra = p.a.attachedRigidbody;
+      Rigidbody rb = p.b.attachedRigidbody;
+      if (ra is null && rb is null) continue;
+      float invMassA = (ra !is null && !ra.isKinematic) ? 1.0f / ra.mass : 0.0f;
+      float invMassB = (rb !is null && !rb.isKinematic) ? 1.0f / rb.mass : 0.0f;
+      float invTotal = invMassA + invMassB;
+      if (invTotal < 1e-10f) continue;
+      foreach (ci; 0 .. p.manifold.count) {
+        ref ContactInfo c = p.manifold.contacts[ci];
+        float pen = max(c.depth - SLOP, 0.0f);
+        if (pen < 1e-6f) continue;
+        Vector3 corr = Vector3Scale(c.normal,
+                                    BAUMGARTE * pen / (invTotal * p.manifold.count));
+        if (ra !is null && !ra.isKinematic)
+          ra.owner.transform.position = Vector3Subtract(
+                                                        ra.owner.transform.position, Vector3Scale(corr, invMassA));
+        if (rb !is null && !rb.isKinematic)
+          rb.owner.transform.position = Vector3Add(
+                                                   rb.owner.transform.position, Vector3Scale(corr, invMassB));
+      }
+    }
+  }
+  
   void fireCallbacks(ContactPair[] current) {
     bool wasContact(Collider a, Collider b) {
       foreach (ref p; _previousContacts)

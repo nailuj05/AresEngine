@@ -6,7 +6,7 @@ import raylib;
 import raygui;
 
 import engine.scene.scene;
-import engine.core.transform : Transform;
+import engine.core.transform : removeFromHierarchy, insertSibling, Transform;
 import engine.core.gameobject;
 
 import editor.style;
@@ -39,33 +39,6 @@ void DrawText(immutable(char*) text, int x, int y, int fs, Color color) { // mim
   float fspacing = cast(float)GuiGetStyle(GuiControl.DEFAULT, GuiDefaultProperty.TEXT_SPACING);
 
   DrawTextEx(font, text, Vector2(x, y), fsize, fspacing, color);
-}
-
-bool removeFromHierarchy(ref Transform[] roots, Transform node) {
-  for (size_t i = 0; i < roots.length; i++) {
-    if (roots[i] is node) {
-      roots = roots[0 .. i] ~ roots[i + 1 .. $];
-      if (node.parent !is null)
-        node.parent.removeChild(node);
-      return true;
-    }
-    if (removeFromHierarchy(roots[i].children, node))
-      return true;
-  }
-  return false;
-}
-
-private bool insertSibling(ref Transform[] arr, Transform target, Transform node, bool after) {
-  for (size_t i = 0; i < arr.length; i++) {
-    if (arr[i] is target) {
-      size_t at = after ? i + 1 : i;
-      arr = arr[0 .. at] ~ [node] ~ arr[at .. $];
-      return true;
-    }
-    if (insertSibling(arr[i].children, target, node, after))
-      return true;
-  }
-  return false;
 }
 
 private bool isDescendant(Transform ancestor, Transform test) {

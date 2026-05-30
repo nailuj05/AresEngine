@@ -11,6 +11,33 @@ enum Axis {
   Z = 2,
 }
 
+// Helpers
+bool removeFromHierarchy(ref Transform[] roots, Transform node) {
+  for (size_t i = 0; i < roots.length; i++) {
+    if (roots[i] is node) {
+      roots = roots[0 .. i] ~ roots[i + 1 .. $];
+      return true;
+    }
+    if (removeFromHierarchy(roots[i].children, node))
+      return true;
+  }
+  return false;
+}
+
+bool insertSibling(ref Transform[] arr, Transform target, Transform node, bool after) {
+  for (size_t i = 0; i < arr.length; i++) {
+    if (arr[i] is target) {
+      size_t at = after ? i + 1 : i;
+      arr = arr[0 .. at] ~ [node] ~ arr[at .. $];
+      return true;
+    }
+    if (insertSibling(arr[i].children, target, node, after))
+      return true;
+  }
+  return false;
+}
+
+// Transform "Component"
 class Transform {
 // private:
   Vector3    _localPosition = Vector3(0, 0, 0);
@@ -75,7 +102,6 @@ public:
     else if (parent !is null)
       parent.removeChild(this, keepWorldPos);
   }
-  
 
   // Transformation
 

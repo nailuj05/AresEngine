@@ -35,15 +35,17 @@ endif
 # endif
 
 RUNTIME_SRC  = $(shell find runtime/ -name '*.d')
-ENGINE_SRC   = $(shell find engine/  -name '*.d')
+ENGINE_SRC = $(shell find engine/ -path engine/tests -prune -o -name '*.d' -print) # prune tests
 EDITOR_SRC   = $(shell find editor/  -name '*.d')
+TEST_SRC   = $(shell find engine/tests/ -name '*.d')
 RAYLIB_D_SRC = $(shell find vendor/raylib/ -name '*.d')
+
 LUA_D_SRC = vendor/lua/lua.d
 
 RUNTIME = $(BUILD_DIR)/runtime
 EDITOR  = $(BUILD_DIR)/editor
 
-.PHONY: all runtime editor release install run-editor test-project clean clean-raylib
+.PHONY: all test runtime editor release install run-editor test-project clean clean-raylib
 
 all: runtime editor
 
@@ -67,6 +69,11 @@ $(RAYLIB_LIB): | $(BUILD_DIR)
 RAYGUI_OBJ = $(BUILD_DIR)/raygui.o
 $(RAYGUI_OBJ): vendor/raygui/raygui.c | $(BUILD_DIR)
 	$(CC) -I$(RAYLIB_SRC) -c $(CFLAGS_EXTRA) $< -o $@
+
+test: $(RAYLIB_LIB) $(LUA_LIB)
+	$(DC) $(DFLAGS) -unittest -main -of=$(BUILD_DIR)/test_runner \
+		$(ENGINE_SRC) $(TEST_SRC) $(RAYLIB_D_SRC) $(LUA_D_SRC) $(LFLAGS)
+	$(BUILD_DIR)/test_runner
 
 # runtime
 runtime: $(RUNTIME)

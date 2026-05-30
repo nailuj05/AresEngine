@@ -5,10 +5,17 @@ import std.algorithm.mutation : remove;
 import engine.core.transform;
 import engine.core.gameobject;
 import engine.rendering.camera;
+import engine.physics.world;
+
+private Scene _activeScene;
+
+Scene activeScene() { return _activeScene; }
+void  setActiveScene(Scene s) { _activeScene = s; }
 
 class Scene {
   string       name;
   Transform[] roots;
+  PhysicsWorld physicsWorld;
   
   this(string name) {
     this.name = name;
@@ -32,6 +39,7 @@ class Scene {
   }
 
   void update(float dt) {
+    physicsWorld.step(dt);
     foreach (t; roots)
       if (t.gameObject.active) t.gameObject.update(dt);
   }

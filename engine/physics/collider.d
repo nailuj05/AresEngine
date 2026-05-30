@@ -3,7 +3,9 @@ module engine.physics.collider;
 import raylib;
 
 import engine.core.component;
+import engine.scene.scene;
 import engine.physics.aabb;
+import engine.physics.rigidbody;
 
 interface ITriggerListener {
   void onTriggerEnter(Collider other);
@@ -12,16 +14,20 @@ interface ITriggerListener {
 }
 
 interface ICollisionListener {
-  void onCollisionEnter(ref ContactInfo hit);
-  void onCollisionStay (ref ContactInfo hit);
-  void onCollisionExit (ref ContactInfo hit);
+  void onCollisionEnter(ref ContactManifold m);
+  void onCollisionStay (ref ContactManifold m);
+  void onCollisionExit (ref ContactManifold m);
 }
 
 struct ContactInfo {
   Vector3 point;
-  // b to a
-  Vector3 normal;
+  Vector3 normal; // b to a
   float   depth;
+}
+
+struct ContactManifold {
+    ContactInfo[4] contacts;
+    int            count;
 }
 
 abstract class Collider : Component {
@@ -30,35 +36,16 @@ abstract class Collider : Component {
   int       layer      = 0;
   
   // null -> static
-  private Rigidbody attachedRigidbody;
+  Rigidbody attachedRigidbody;
 
   abstract AABB   bounds();
-  abstract bool   intersects(Collider other, out ContactInfo hit);
 
-  override void onStart();
-  override void onDestroy();
-}
-
-// primitive colliders
-class SphereCollider : Collider {
-  mixin Named!"SphereCollider";
-  float   radius = 0.5f;
-  Vector3 center;
-  override AABB bounds();
-}
-
-class BoxCollider : Collider {
-  mixin Named!"BoxCollider";
-  Vector3 size = Vector3(1, 1, 1);
-  Vector3 center;
-  override AABB bounds();
-}
-
-class CapsuleCollider : Collider {
-  mixin Named!"CapsuleCollider";
-  float   radius = 0.5f;
-  float   height = 2.0f;
-  int     axis   = 1;
-  Vector3 center;
-  override AABB bounds();
+  override void onStart() {
+    attachedRigidbody = owner.getComponent!Rigidbody();
+    activeScene().physicsWorld.register(this);
+  }
+ 
+  override void onDestroy() {
+    activeScene().physicsWorld.unregister(this);
+  }
 }

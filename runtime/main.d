@@ -13,6 +13,7 @@ import engine.scene.scene;
 import engine.scene.loader;
 import engine.scripting.luaruntime;
 import engine.rendering.camera : Camera;
+import engine.physics.world;
 
 static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("logo/logo-icon.png");
 
@@ -67,6 +68,10 @@ int main(string[] args) {
   SetWindowIcon(icon);
 
   activeScene = loadScene(scenePath);
+
+  activeScene.physicsWorld = new PhysicsWorld();
+  setActiveScene(activeScene);
+
   activeScene.start();
   mainCamera = activeScene.getMainCamera();
 

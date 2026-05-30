@@ -148,6 +148,8 @@ int main(string[] args) {
   activeScene = loadScene(mainScene);
   log("Scene: ", activeScene.name, " loaded");
 
+  setActiveScene(activeScene);
+
   activeScene.editorStart();
   log("Editor Start");
 

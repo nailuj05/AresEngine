@@ -22,6 +22,10 @@ class Rigidbody : Component {
 
   @DontSerialize Vector3 inertiaTensor;
 
+  // cached per fixed step, written by PhysicsWorld
+  package Vector3 _c0, _c1, _c2; // rotation matrix columns
+  package Vector3 _localInv;
+
   // Returns the world-space inverse inertia tensor (diagonal 3x3 as Vector3).
   Vector3 worldInverseInertia() nothrow {
     if (inertiaTensor.x < 1e-10f) return Vector3(0, 0, 0);
@@ -29,26 +33,29 @@ class Rigidbody : Component {
     Vector3 localInv = Vector3(1.0f / inertiaTensor.x,
                                1.0f / inertiaTensor.y,
                                1.0f / inertiaTensor.z);
-    // For a diagonal tensor, world-space inverse is R * diag(localInv) * R^T.
-    // Applying it to a vector v: result = R * (localInv * (R^T * v))
-    // We store it as a lambda-style method; callers use applyInverseInertia.
     return localInv;
   }
 
   // Apply world-space inverse inertia tensor to a vector.
+  void cacheStepData() nothrow {
+    Vector3 li = worldInverseInertia();
+    _localInv  = li;
+    Matrix m   = QuaternionToMatrix(owner.transform.localRotation);
+    // raylib Matrix is column-major: col0 = (m0,m1,m2), col1 = (m4,m5,m6), col2 = (m8,m9,m10)
+    _c0 = Vector3(m.m0, m.m1, m.m2);
+    _c1 = Vector3(m.m4, m.m5, m.m6);
+    _c2 = Vector3(m.m8, m.m9, m.m10);
+  }
+
   Vector3 applyInverseInertia(Vector3 v) nothrow {
-    Vector3 localInv = worldInverseInertia();
-    if (localInv.x < 1e-10f) return Vector3(0, 0, 0);
-
-    // Bring v into local space, scale by localInv, bring back to world space.
-    Quaternion q    = owner.transform.localRotation;
-    Quaternion qInv = QuaternionInvert(q);
-
-    Vector3 local  = Vector3RotateByQuaternion(v, qInv);
-    Vector3 scaled = Vector3(local.x * localInv.x,
-                             local.y * localInv.y,
-                             local.z * localInv.z);
-    return Vector3RotateByQuaternion(scaled, q);
+    if (_localInv.x < 1e-10f) return Vector3(0, 0, 0);
+    float ux = _c0.x*v.x + _c0.y*v.y + _c0.z*v.z;
+    float uy = _c1.x*v.x + _c1.y*v.y + _c1.z*v.z;
+    float uz = _c2.x*v.x + _c2.y*v.y + _c2.z*v.z;
+    ux *= _localInv.x; uy *= _localInv.y; uz *= _localInv.z;
+    return Vector3(_c0.x*ux + _c1.x*uy + _c2.x*uz,
+                   _c0.y*ux + _c1.y*uy + _c2.y*uz,
+                   _c0.z*ux + _c1.z*uy + _c2.z*uz);
   }
 
   void addForce(Vector3 force) {

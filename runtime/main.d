@@ -30,11 +30,14 @@ void log(T...)(T args) {
 
 int main(string[] args) {
   bool help;
+  bool physProfile;
   string scenePath;
-  getopt(args, "help|h", &help, "scene|s", &scenePath);
-
+  getopt(args,
+         "help|h",    &help,
+         "scene|s",   &scenePath,
+         "phys-prof", &physProfile);
   if (help) {
-    log("usage: runtime [--scene <path>]");
+    log("usage: runtime [--scene <path>] [--phys-prof]");
     return 0;
   }
 
@@ -71,26 +74,24 @@ int main(string[] args) {
 
   activeScene.physicsWorld = new PhysicsWorld();
   setActiveScene(activeScene);
-
   activeScene.start();
   mainCamera = activeScene.getMainCamera();
-
   if (mainCamera is null) {
     log("main camera is null");
     return 1;
   }
-
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();
     activeScene.update(dt);
-
     BeginDrawing();
-      ClearBackground(Colors.BLACK);
-      BeginMode3D(mainCamera.rcamera);
-        DrawGrid(20, 1.0f); // for debugging
-        activeScene.draw();
-      EndMode3D();
-      DrawFPS(10, 10);
+    ClearBackground(Colors.BLACK);
+    BeginMode3D(mainCamera.rcamera);
+    DrawGrid(20, 1.0f);
+    activeScene.draw();
+    EndMode3D();
+    DrawFPS(10, 10);
+    if (physProfile)
+      drawPhysicsProfile(activeScene.physicsWorld.lastProfile);
     EndDrawing();
   }
 
@@ -99,4 +100,40 @@ int main(string[] args) {
   activeScene.destroy();
 
   return 0;
+}
+
+private void drawPhysicsProfile(ref PhysicsProfile p) {
+  import std.string : toStringz;
+  import std.format : format;
+  import raylib : DrawRectangle, DrawText, Color, Colors;
+  enum int fz = 20;
+
+  immutable int x  = 10;
+  immutable int y  = 30;
+  immutable int lh = 24;
+  immutable Color bg  = Color(0, 0, 0, 160);
+  immutable Color fg  = Colors.WHITE;
+  immutable Color dim = Color(180, 180, 180, 255);
+
+  immutable long total = p.integrateUs + p.broadphaseUs
+    + p.narrowphaseUs + p.solverUs + p.correctionUs;
+
+  DrawRectangle(x - 4, y - 4, 260, lh * 8 + 8, bg);
+
+  void row(string label, long us, int line) {
+    DrawText((label ~ ":").toStringz,         x,       y + line * lh, fz, dim);
+    DrawText(format("%4d us", us).toStringz,  x + 130, y + line * lh, fz, fg);
+  }
+
+  row("integrate",   p.integrateUs,   0);
+  row("broadphase",  p.broadphaseUs,  1);
+  row("narrowphase", p.narrowphaseUs, 2);
+  row("solver",      p.solverUs,      3);
+  row("correction",  p.correctionUs,  4);
+  row("total",       total,           5);
+
+  DrawText(format("pairs  broad/narrow: %d / %d",
+                  p.pairsAfterBroad, p.pairsAfterNarrow).toStringz, x, y + 6 * lh, fz, dim);
+  DrawText(format("contacts: %d", p.totalContacts).toStringz,
+           x, y + 7 * lh, fz, dim);
 }

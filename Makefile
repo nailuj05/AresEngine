@@ -78,7 +78,7 @@ test: $(RAYLIB_LIB) $(LUA_LIB)
 # runtime
 runtime: $(RUNTIME)
 $(RUNTIME): $(RUNTIME_SRC) $(ENGINE_SRC) $(RAYLIB_D_SRC) $(LUA_D_SRC) | $(BUILD_DIR) $(RAYLIB_LIB) $(LUA_LIB)
-	$(DC) $(DFLAGS) -of=$@ $^ $(LFLAGS)
+	$(DC) $(DFLAGS) -version=Profile -of=$@ $^ $(LFLAGS)
 
 # editor
 editor: $(EDITOR) runtime

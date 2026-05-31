@@ -1,7 +1,7 @@
 module engine.physics.boxcollider;
  
 import std.math : abs;
-import raylib   : Vector3, Matrix;
+import raylib;
 import raylib.raymath;
  
 import engine.core.component;
@@ -44,6 +44,14 @@ class BoxCollider : Collider {
                 Vector3Add     (b.center, ext));
   }
 
+  override void onDraw() {
+    rlPushMatrix();
+    auto m = MatrixToFloat(owner.transform.worldMatrix());
+    rlMultMatrixf(m.ptr);
+    DrawCubeWires(Vector3.zero, 1.0f, 1.0f, 1.0f, Colors.BLUE);
+    rlPopMatrix();
+  }
+  
   version(Editor) {
     import editor.inspector.drawer;
 

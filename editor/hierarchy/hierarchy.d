@@ -84,27 +84,22 @@ private int measureGameObject(GameObject current) {
 }
 
 void drawHierarchy(Rectangle panel, Scene activeScene, ref GameObject selected) {
-  DrawRectangle(cast(int)panel.x, cast(int)panel.y,
-                cast(int)panel.width, cast(int)panel.height, GetColor(PANEL_BG));
+  DrawRectangle(cast(int)panel.x, cast(int)panel.y, cast(int)panel.width, cast(int)panel.height, GetColor(PANEL_BG));
   GuiPanel(panel, "Hierarchy");
 
-  // content area below the panel title bar (28 px header)
-  enum HEADER = 28;
-  // leave room for a vertical scrollbar (15 px)
-  enum SB_W   = 15;
-  Rectangle view = Rectangle(panel.x, panel.y + HEADER,
-                              panel.width - SB_W, panel.height - HEADER);
+  enum HEADER = 24;
+  enum SB_W   = 0;
+  Rectangle view = Rectangle(panel.x, panel.y + HEADER, panel.width - SB_W, panel.height - HEADER);
 
   int contentHeight = measureHierarchy(activeScene.roots);
-  // GuiScrollPanel wants the content rect relative to the view origin
-  Rectangle content = Rectangle(0, 0, view.width, cast(float)contentHeight);
+  Rectangle content = Rectangle(0, 0, view.width - SB_W, cast(float)contentHeight);
 
   Rectangle scissor;
   GuiScrollPanel(view, null, content, &g_scroll, &scissor);
-
+  g_scroll.x = 0;
+  
   // clip all drawing to the view area
-  BeginScissorMode(cast(int)scissor.x, cast(int)scissor.y,
-                   cast(int)scissor.width, cast(int)scissor.height);
+  BeginScissorMode(cast(int)scissor.x, cast(int)scissor.y, cast(int)scissor.width, cast(int)scissor.height);
 
   g_drop = DropInfo.init;
 
@@ -117,15 +112,14 @@ void drawHierarchy(Rectangle panel, Scene activeScene, ref GameObject selected) 
       g_dragActive = true;
   }
 
-  // scrollOffset shifts rows upward; mouse position is in screen space so
-  // hit-testing offsets by the same amount (handled inside drawGameObject)
+  // scrollOffset shifts rows upward
   int y = cast(int)(view.y + g_scroll.y);
   foreach (go; activeScene.roots)
     y = drawGameObject(cast(int)view.x + PAD, y, cast(int)view.width, go.gameObject, selected, view);
 
   EndScissorMode();
 
-  // floating drag label - drawn outside scissor so it follows the cursor freely
+  // floating drag label
   if (g_dragActive && g_dragging !is null) {
     Vector2 m = GetMousePosition();
     DrawGuiText(g_dragging.name.toStringz(),
@@ -139,9 +133,7 @@ void drawHierarchy(Rectangle panel, Scene activeScene, ref GameObject selected) 
   }
 }
 
-// view is passed so we can reject mouse events outside the clipped area
-private int drawGameObject(int ox, int oy, int width, GameObject current,
-                           ref GameObject selected, Rectangle view) {
+private int drawGameObject(int ox, int oy, int width, GameObject current, ref GameObject selected, Rectangle view) {
   bool hasChildren = current.transform.children.length > 0;
   auto rowRect  = Rectangle(ox + HEIGHT, oy, width - ox - PAD - HEIGHT, HEIGHT);
   auto arrowRect = Rectangle(ox, oy, HEIGHT, HEIGHT);
@@ -173,10 +165,8 @@ private int drawGameObject(int ox, int oy, int width, GameObject current,
            :                         Colors.BLANK;
   DrawRectangleRec(rowRect, bg);
   DrawPolyLines(Vector2(rowRect.x + 10, rowRect.y + 10), 4, 6, 0.0f, Colors.WHITE);
-  DrawGuiText(current.name.toStringz(),
-              cast(int)rowRect.x + HEIGHT, cast(int)rowRect.y, 0, Colors.WHITE);
-  DrawLineEx(Vector2(rowRect.x, rowRect.y + rowRect.height),
-             Vector2(rowRect.x + rowRect.width, rowRect.y + rowRect.height), 1, Colors.GRAY);
+  DrawGuiText(current.name.toStringz(), cast(int)rowRect.x + HEIGHT, cast(int)rowRect.y, 0, Colors.WHITE);
+  DrawLineEx(Vector2(rowRect.x, rowRect.y + rowRect.height), Vector2(rowRect.x + rowRect.width, rowRect.y + rowRect.height), 1, Colors.GRAY);
 
   string arrow = current.expanded ? "#120#" : "#119#";
   if (hasChildren && inView && GuiButton(arrowRect, arrow.toStringz())) {
@@ -186,12 +176,10 @@ private int drawGameObject(int ox, int oy, int width, GameObject current,
   if (g_drop.valid && g_drop.target is current) {
     final switch (g_drop.zone) {
     case DropInfo.Zone.Before:
-      DrawLineEx(Vector2(rowRect.x, rowRect.y),
-                 Vector2(rowRect.x + rowRect.width, rowRect.y), 2, Colors.YELLOW);
+      DrawLineEx(Vector2(rowRect.x, rowRect.y), Vector2(rowRect.x + rowRect.width, rowRect.y), 2, Colors.YELLOW);
       break;
     case DropInfo.Zone.After:
-      DrawLineEx(Vector2(rowRect.x, rowRect.y + rowRect.height),
-                 Vector2(rowRect.x + rowRect.width, rowRect.y + rowRect.height), 2, Colors.YELLOW);
+      DrawLineEx(Vector2(rowRect.x, rowRect.y + rowRect.height), Vector2(rowRect.x + rowRect.width, rowRect.y + rowRect.height), 2, Colors.YELLOW);
       break;
     case DropInfo.Zone.Into:
       DrawRectangleLinesEx(rowRect, 2, Colors.YELLOW);

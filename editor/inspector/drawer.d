@@ -43,12 +43,7 @@ private bool textBoxRow(ref FieldState s, Rectangle r) {
   return false;
 }
 
-private bool drawVec3Row(
-    string label,
-    ref float x, ref float y, ref float z,
-    ref FieldState[3] fs,
-    float ox, float oy, float pw)
-{
+private bool drawVec3Row(string label, ref float x, ref float y, ref float z, ref FieldState[3] fs, float ox, float oy, float pw) {
   syncBuffer(fs[0], x);
   syncBuffer(fs[1], y);
   syncBuffer(fs[2], z);
@@ -59,7 +54,6 @@ private bool drawVec3Row(
 
   GuiLabel(Rectangle(ox + 8, oy, LABEL_W, FIELD_H), label.toStringz);
 
-  // fixed: was [&x, &y, &z][i] which allocates a GC slice each call
   float*[3] targets = [&x, &y, &z];
   foreach (i; 0 .. 3) {
     if (textBoxRow(fs[i], Rectangle(cx, oy, fw, FIELD_H))) {
@@ -177,8 +171,7 @@ float drawFields(T)(ref T obj, ref FieldState[string] states, float ox, float oy
 
   foreach (i, ref field; obj.tupleof) {
     static if (__traits(getProtection, obj.tupleof[i]) == "public"
-        && !hasUDA!(obj.tupleof[i], DontSerialize))
-    {
+        && !hasUDA!(obj.tupleof[i], DontSerialize)) {
       enum name      = __traits(identifier, obj.tupleof[i]);
       alias FieldType = typeof(field);
 

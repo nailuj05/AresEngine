@@ -20,9 +20,11 @@ void updateEditorCamera(ref Camera3D cam, Rectangle r) {
   enum float PAN_FACTOR   = 0.0005f;
   enum float ZOOM_FACTOR  = 0.05f;
 
+  bool inViewport = CheckCollisionPointRec(GetMousePosition(), r);
+  
   // zoom (scroll wheel)
   float wheel = GetMouseWheelMove();
-  if (wheel != 0.0f) {
+  if (wheel != 0.0f && inViewport) {
     Vector3 toTarget = Vector3Subtract(cam.target, cam.position);
     float   dist     = Vector3Length(toTarget);
     dist = clamp(dist - wheel * dist * ZOOM_FACTOR, 0.5f, 1000.0f);
@@ -33,7 +35,7 @@ void updateEditorCamera(ref Camera3D cam, Rectangle r) {
   static bool dragStartedInViewport = false;
 
   if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT))
-    dragStartedInViewport = CheckCollisionPointRec(GetMousePosition(), r);
+    dragStartedInViewport = inViewport;
 
   if (!IsMouseButtonDown(MouseButton.MOUSE_BUTTON_LEFT)) {
     dragStartedInViewport = false;

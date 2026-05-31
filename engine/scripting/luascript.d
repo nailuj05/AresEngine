@@ -233,7 +233,7 @@ class LuaScript : Component, IExtraSerializable {
     private FieldState[] _fieldStates;
     private FieldState _scriptPathState;
 
-    override ulong drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {
+    override float drawInspector(float offsetX, float offsetY, float panelW) {
       string sp = _scriptPath;
       drawField("scriptPath", sp, _scriptPathState, offsetX, offsetY, panelW);
       scriptPath = sp;

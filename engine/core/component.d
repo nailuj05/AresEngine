@@ -40,6 +40,6 @@ abstract class Component {
   void onEditorDestroy()  {}
 
   version(Editor) {
-    abstract ulong drawInspector(ulong offsetX, ulong offsetY, ulong panelW);
+    abstract float drawInspector(float offsetX, float offsetY, float panelW);
   }
 }

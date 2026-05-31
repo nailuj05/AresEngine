@@ -33,7 +33,7 @@ class Oscillator : Component {
 
     private FieldState[string] fieldStates;
     
-    override ulong drawInspector(ulong offsetX, ulong offsetY, ulong panelW) {
+    override float drawInspector(float offsetX, float offsetY, float panelW) {
       auto self = this;
       return drawFields(self, fieldStates, offsetX, offsetY, panelW);
     }

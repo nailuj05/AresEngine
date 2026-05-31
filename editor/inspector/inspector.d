@@ -11,9 +11,10 @@ import engine.core.component;
 import editor.style;
 import editor.inspector.drawer;
 
-
-static int  addCompActive = 0;
-static bool addCompOpen   = false;
+struct InspectorState {
+  bool addCompOpen;
+  int  addCompActive; // reserved for keyboard navigation in the add-component list
+}
 
 static immutable string[] COMPONENT_NAMES = () {
   string[] names;
@@ -22,8 +23,8 @@ static immutable string[] COMPONENT_NAMES = () {
   return names;
 }();
 
-void drawInspector(Rectangle r, GameObject selected) {
-  DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
+void drawInspector(Rectangle r, GameObject selected, ref InspectorState state) {
+  DrawRectangle(cast(int) r.x, cast(int) r.y, cast(int) r.width, cast(int) r.height, GetColor(PANEL_BG));
   GuiPanel(r, "Inspector");
   if (selected is null) return;
 
@@ -31,7 +32,7 @@ void drawInspector(Rectangle r, GameObject selected) {
   float y = r.y + 32;
   float w = r.width;
 
-  // Draw Name + Transform Fields
+  // Name + Transform
   drawField("Name", selected.name, selected.nameFS, x, y, w);
   y += ROW_H;
 
@@ -56,42 +57,41 @@ void drawInspector(Rectangle r, GameObject selected) {
     selected.transform.localScale = scl;
   y += ROW_H;
 
-  // Draw individual components
+  // Per-component sections
   foreach (component; selected.components) {
     GuiLine(Rectangle(x, y, w, 1), null);
     y += 8;
 
     GuiLabel(Rectangle(x + 8, y, w - 8, FIELD_H), component.name.toStringz);
-
-    if (GuiButton(Rectangle(x + w - 20 - 8, y, 20, 20), "x")) {
+    if (GuiButton(Rectangle(x + w - 28, y, 20, 20), "x"))
       selected.removeComponent(component);
-    }
-    
+
     y += ROW_H;
-    y = cast(float)component.drawInspector(cast(ulong)x + 8, cast(ulong)y, cast(ulong)w - 8);
+    y = component.drawInspector(x + 8, y, w - 8);
   }
 
   GuiLine(Rectangle(x, y, w, 1), null);
   y += 8;
 
-  // Add Component
+  // Add Component dropdown
   if (GuiButton(Rectangle(x + 12, y, w - 20, FIELD_H), "Add Component"))
-    addCompOpen = !addCompOpen;
+    state.addCompOpen = !state.addCompOpen;
 
-  if (addCompOpen && selected !is null) {
-    Rectangle dropRect = Rectangle(x + 12, y + FIELD_H, w - 20, FIELD_H * COMPONENT_NAMES.length);
+  if (state.addCompOpen) {
+    float dropH = FIELD_H * cast(float) COMPONENT_NAMES.length;
+    Rectangle dropRect = Rectangle(x + 12, y + FIELD_H, w - 20, dropH);
     DrawRectangleRec(dropRect, GetColor(PANEL_BG));
     DrawRectangleLinesEx(dropRect, 1, Fade(Colors.BLACK, 0.45f));
 
     foreach (i, C; KnownComponents) {
       if (GuiButton(Rectangle(x + 12, y + FIELD_H * (i + 1), w - 20, FIELD_H), COMPONENT_NAMES[i].toStringz)) {
         selected.addComponent!C();
-        addCompOpen = false;
+        state.addCompOpen = false;
       }
     }
 
     if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) &&
         !CheckCollisionPointRec(GetMousePosition(), dropRect))
-      addCompOpen = false;
+      state.addCompOpen = false;
   }
 }

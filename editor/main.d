@@ -31,6 +31,7 @@ import editor.viewport.gizmos;
 import editor.viewport.viewport;
 import editor.inspector.inspector;
 import editor.hierarchy.hierarchy;
+import editor.inspector.drawer : colorPicker; 
 
 // Comp-time embedded assets
 static immutable ubyte[] FONT_DATA  = cast(immutable ubyte[]) import("fonts/Inter.ttf");
@@ -48,9 +49,10 @@ private Camera3D        editorCam;
 
 // Editor
 private GizmoState gizmo;
+private InspectorState inspectorState;
+
 private FileDialog fileDialog;
 private SettingsDialog settingsDialog;
-import editor.inspector.drawer : colorPicker; 
 
 private bool exitRequested;
 
@@ -174,7 +176,7 @@ int main(string[] args) {
       if (activeMenu >= 0) GuiSetState(GuiState.STATE_DISABLED);
       drawHierarchy(hierarchy, activeScene, selected);
       auto selection = drawViewport(viewport, sceneTarget);
-      drawInspector(inspector, selected);
+      drawInspector(inspector, selected, inspectorState);
       drawFolder(folder);
       GuiSetState(GuiState.STATE_NORMAL);
       auto action = drawTopBar(topBar, activeScene.name);

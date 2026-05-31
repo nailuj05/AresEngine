@@ -39,7 +39,7 @@ bool insertSibling(ref Transform[] arr, Transform target, Transform node, bool a
 
 // Transform "Component"
 class Transform {
-// private:
+private:
   Vector3    _localPosition = Vector3(0, 0, 0);
   Quaternion _localRotation = Quaternion(0, 0, 0, 1);
   Vector3    _localScale    = Vector3(1, 1, 1);
@@ -52,6 +52,8 @@ public:
   Transform parent;
   Transform[] children;
   GameObject gameObject;
+
+  ulong _version = 0;
   
   this(GameObject gameObject) {
     this.gameObject = gameObject;
@@ -213,6 +215,7 @@ public:
 
 package:
   void markDirty() nothrow {
+    _version++;
     if (_localDirty && _worldDirty) return;
     _localDirty = true;
     markWorldDirty();

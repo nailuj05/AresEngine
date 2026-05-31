@@ -15,8 +15,20 @@ class BoxCollider : Collider {
  
   Vector3 size   = Vector3(1, 1, 1);
   Vector3 center;          // local offset
- 
+
+  private OBB  _cachedOBB;
+  private ulong _obbVersion = ulong.max; // max so first call always misses
+
   OBB obb() {
+    ulong tv = owner.transform._version;
+    if (tv != _obbVersion) {
+      _cachedOBB  = computeOBB();
+      _obbVersion = tv;
+    }
+    return _cachedOBB;
+  }  
+
+  private OBB computeOBB() {
     Matrix  wm     = owner.transform.worldMatrix();
     Vector3 wscale = owner.transform.scale;
     OBB box;

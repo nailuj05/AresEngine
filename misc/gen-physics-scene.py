@@ -109,7 +109,7 @@ def main():
         "name": "Floor",
         "position": {"x": 0.0, "y": 0.0, "z": 0.0},
         "rotation": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0},
-        "scale": {"x": 10.0, "y": 0.1, "z": 10.0}
+        "scale": {"x": 25.0, "y": 0.1, "z": 25.0}
     }
 
     camera = {
@@ -120,7 +120,7 @@ def main():
                 "enabled": True,
                 "fields": {
                     "farPlane": 1000.0,
-                    "fieldOfView": 80.0,
+                    "fieldOfView": 90.0,
                     "nearPlane": 0.1,
                     "projection": 0
                 },
@@ -128,7 +128,7 @@ def main():
             }
         ],
         "name": "Camera",
-        "position": {"x": 0.0, "y": 3.30279874801635742, "z": -4.99348735809326172},
+        "position": {"x": 0.0, "y": 15.0, "z": -20.0},
         "rotation": {"w": 0.975952804088592529, "x": 0.217981964349746704, "y": 0.0, "z": 0.0},
         "scale": {"x": 1.0, "y": 1.0, "z": 1.0}
     }

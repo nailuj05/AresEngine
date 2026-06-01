@@ -4,6 +4,7 @@ import std.stdio;
 import std.math : abs;
 import std.algorithm : max, sort, remove;
 import std.datetime.stopwatch : StopWatch;
+import std.parallelism : parallel, taskPool;
 
 import raylib : Vector3, Quaternion, Matrix;
 import raylib.raymath;
@@ -33,6 +34,7 @@ PhysicsProfile lastProfile;
 struct ContactPair {
   Collider        a, b;
   ContactManifold manifold;
+  float invMassA, invMassB;
 }
 
 // General TODO: use overloaded operators instead of raylib functions for vectors for readability (partially done already but should be consistent)
@@ -73,8 +75,12 @@ class PhysicsWorld {
 private:
   float _accumulator = 0;
   int[]  _sleepCounters; // parallel to bodies[]
-  ContactPair[] _previousContacts;
+  ContactPair[] _pairs;
+  ContactPair[] _previousPairs; 
  
+  struct Entry { float min, max; Collider c; AABB aabb; }
+  Entry[] _broadEntries;
+  
   void fixedStep() {
     Profiler p;
 
@@ -83,36 +89,51 @@ private:
     lastProfile.integrateUs = p.stop();
 
     p.start();
-    auto pairs = broadphase();
+    broadphase();
     lastProfile.broadphaseUs = p.stop();
-    lastProfile.pairsAfterBroad = cast(int)pairs.length;
+    lastProfile.pairsAfterBroad = cast(int)_pairs.length;
 
     p.start();
-    narrowphase(pairs);
+    narrowphase();
     lastProfile.narrowphaseUs = p.stop();
     version(Profile) {
-      lastProfile.pairsAfterNarrow = cast(int)pairs.length;
+      lastProfile.pairsAfterNarrow = cast(int)_pairs.length;
       lastProfile.totalContacts = 0;
-      foreach (ref pa; pairs)
+      foreach (ref pa; _pairs)
         lastProfile.totalContacts += pa.manifold.count;
     }
 
-    foreach (rb; bodies)
-        if (!rb.isSleeping && !rb.isKinematic)
-            rb.cacheStepData();
+    foreach (rb; bodies) {
+      if (!rb.isSleeping && !rb.isKinematic)
+        rb.cacheStepData();
+    }
 
     p.start();
-    foreach (_; 0 .. solverIterations)
-        foreach (ref pr; pairs)
-            resolve(pr);
+    foreach (ref pr; _pairs) {
+      Rigidbody ra = pr.a.attachedRigidbody;
+      Rigidbody rb = pr.b.attachedRigidbody;
+      pr.invMassA = (ra !is null && !ra.isKinematic) ? 1.0f / ra.mass : 0.0f;
+      pr.invMassB = (rb !is null && !rb.isKinematic) ? 1.0f / rb.mass : 0.0f;
+    }
+    foreach (_; 0 .. solverIterations) {
+      foreach (ref pr; _pairs) {
+        Rigidbody ra = pr.a.attachedRigidbody;
+        Rigidbody rb = pr.b.attachedRigidbody;
+        bool aAsleep = ra is null || ra.isSleeping || ra.isKinematic;
+        bool bAsleep = rb is null || rb.isSleeping || rb.isKinematic;
+        if (aAsleep && bAsleep) continue;
+        resolve(pr);
+      }
+    }
     lastProfile.solverUs = p.stop();
 
     p.start();
-    correctPositions(pairs);
+    correctPositions(_pairs);
     lastProfile.correctionUs = p.stop();
 
-    fireCallbacks(pairs);
-    _previousContacts = pairs;
+    fireCallbacks(_pairs);
+    import std.algorithm : swap;
+    swap(_pairs, _previousPairs);
     updateSleeping();
   }
  
@@ -141,12 +162,11 @@ private:
     }
   } 
 
-  ContactPair[] broadphase() {
-    // Build (AABB, collider) pairs and sort by min on broadphaseAxis
-    struct Entry { float min, max; Collider c; AABB aabb; }
-    Entry[] entries;
-    entries.reserve(colliders.length);
-    foreach (c; colliders) {
+  void broadphase() {
+    if (_broadEntries.length != colliders.length)
+      _broadEntries.length = colliders.length;
+
+    foreach (i, c; colliders) {
       AABB b = c.bounds();
       float mn, mx;
       final switch (broadphaseAxis) {
@@ -154,22 +174,19 @@ private:
       case Axis.Y: mn = b.min.y; mx = b.max.y; break;
       case Axis.Z: mn = b.min.z; mx = b.max.z; break;
       }
-      entries ~= Entry(mn, mx, c, b);
+      _broadEntries[i] = Entry(mn, mx, c, b);
     }
 
-    void insertionSort(Entry)(Entry[] arr) {
-      foreach (i; 1 .. arr.length) {
-        auto key = arr[i];
-        long j   = cast(long)i - 1;
-        while (j >= 0 && arr[j].min > key.min) {
-          arr[j + 1] = arr[j];
-          j--;
-        }
-        arr[j + 1] = key;
+    // Insertion Sort
+    foreach (i; 1 .. _broadEntries.length) {
+      auto key = _broadEntries[i];
+      long j = cast(long)i - 1;
+      while (j >= 0 && _broadEntries[j].min > key.min) {
+        _broadEntries[j + 1] = _broadEntries[j];
+        j--;
       }
+      _broadEntries[j + 1] = key;
     }
-
-    insertionSort(entries);
     
     bool aabbOverlap(AABB a, AABB b) {
       return a.max.x >= b.min.x && a.min.x <= b.max.x
@@ -178,41 +195,58 @@ private:
     }
 
     // Sweep: emit candidate pairs while intervals overlap on sort axis
-    ContactPair[] pairs;
-    foreach (i; 0 .. entries.length) {
-      foreach (j; i + 1 .. entries.length) {
-        if (entries[j].min > entries[i].max) break;
-        auto ca = entries[i].c;
-        auto cb = entries[j].c;
+    size_t count = 0;
+    foreach (i; 0 .. _broadEntries.length) {
+      foreach (j; i + 1 .. _broadEntries.length) {
+        if (_broadEntries[j].min > _broadEntries[i].max) break;
+        auto ca = _broadEntries[i].c;
+        auto cb = _broadEntries[j].c;
         if (ca.attachedRigidbody is null && cb.attachedRigidbody is null) continue;
-        if (!aabbOverlap(entries[i].aabb, entries[j].aabb)) continue; // <--
-        pairs ~= ContactPair(ca, cb);
+        if (!aabbOverlap(_broadEntries[i].aabb, _broadEntries[j].aabb)) continue;
+
+        if (count >= _pairs.length)
+          _pairs.length = count + 64; // grow in chunks, not one-by-one
+
+        _pairs[count++] = ContactPair(ca, cb);
       }
     }
-    return pairs;
+    _pairs.length = count; // trim to size
   }
  
-  void narrowphase(ref ContactPair[] pairs) {
+  private ContactManifold[] _manifoldScratch;
+  private bool[]            _hitScratch;
+  void narrowphase() {
+    if (_manifoldScratch.length < _pairs.length)
+      _manifoldScratch.length = _pairs.length;
+    if (_hitScratch.length < _pairs.length)
+      _hitScratch.length = _pairs.length;
+
+    foreach (c; colliders) {
+      if (auto bc = cast(BoxCollider)c)
+        bc.obb(); // populates cache, safe to read in parallel after this
+    }
+ 
+    foreach (i, ref p; taskPool.parallel(_pairs)) {
+      _hitScratch[i] = dispatchNarrowphase(p.a, p.b, _manifoldScratch[i]);
+    }
+
     size_t keep = 0;
-    foreach (ref p; pairs) {
-      ContactManifold m;
-      if (dispatchNarrowphase(p.a, p.b, m)) {
-        p.manifold    = m;
-        pairs[keep++] = p;
+    foreach (i, ref p; _pairs) {
+      if (_hitScratch[i]) {
+        p.manifold        = _manifoldScratch[i];
+        _pairs[keep++] = p;
       }
     }
-    pairs.length = keep;
-  } 
+    _pairs.length = keep;
+  }
 
   void resolve(ref ContactPair p) {
     if (p.a.isTrigger || p.b.isTrigger) return;
     Rigidbody ra = p.a.attachedRigidbody;
     Rigidbody rb = p.b.attachedRigidbody;
     if (ra is null && rb is null) return;
-    float invMassA = (ra !is null && !ra.isKinematic) ? 1.0f / ra.mass : 0.0f;
-    float invMassB = (rb !is null && !rb.isKinematic) ? 1.0f / rb.mass : 0.0f;
     foreach (ci; 0 .. p.manifold.count)
-      resolveContact(ra, rb, invMassA, invMassB, p.manifold.contacts[ci], p.manifold.count);
+      resolveContact(ra, rb, p.invMassA, p.invMassB, p.manifold.contacts[ci], p.manifold.count);
   }
 
   void resolveContact(Rigidbody ra, Rigidbody rb, float invMassA, float invMassB, ref ContactInfo c, int manifoldCount) {
@@ -317,25 +351,26 @@ private:
   void correctPositions(ref ContactPair[] pairs) {
     foreach (ref p; pairs) {
       if (p.a.isTrigger || p.b.isTrigger) continue;
+
       Rigidbody ra = p.a.attachedRigidbody;
       Rigidbody rb = p.b.attachedRigidbody;
       if (ra is null && rb is null) continue;
-      float invMassA = (ra !is null && !ra.isKinematic) ? 1.0f / ra.mass : 0.0f;
-      float invMassB = (rb !is null && !rb.isKinematic) ? 1.0f / rb.mass : 0.0f;
-      float invTotal = invMassA + invMassB;
+
+      float invTotal = p.invMassA + p.invMassB;
       if (invTotal < 1e-10f) continue;
+
       foreach (ci; 0 .. p.manifold.count) {
         ref ContactInfo c = p.manifold.contacts[ci];
+
         float pen = max(c.depth - SLOP, 0.0f);
         if (pen < 1e-6f) continue;
-        Vector3 corr = Vector3Scale(c.normal,
-                                    BAUMGARTE * pen / (invTotal * p.manifold.count));
+
+        Vector3 corr = Vector3Scale(c.normal, BAUMGARTE * pen / (invTotal * p.manifold.count));
+        
         if (ra !is null && !ra.isKinematic)
-          ra.owner.transform.position = Vector3Subtract(
-                                                        ra.owner.transform.position, Vector3Scale(corr, invMassA));
+          ra.owner.transform.position = Vector3Subtract(ra.owner.transform.position, Vector3Scale(corr, p.invMassA));
         if (rb !is null && !rb.isKinematic)
-          rb.owner.transform.position = Vector3Add(
-                                                   rb.owner.transform.position, Vector3Scale(corr, invMassB));
+          rb.owner.transform.position = Vector3Add(rb.owner.transform.position, Vector3Scale(corr, p.invMassB));
       }
     }
   }
@@ -350,7 +385,7 @@ private:
 
   void fireCallbacks(ContactPair[] current) {
     _prevContactSet.clear();
-    foreach (ref p; _previousContacts)
+    foreach (ref p; _previousPairs)
       _prevContactSet[contactKey(p.a, p.b)] = true;
 
     bool wasContact(Collider a, Collider b) {
@@ -381,7 +416,7 @@ private:
     foreach (ref p; current)
       notify(p, p.a.isTrigger || p.b.isTrigger);
 
-    foreach (ref prev; _previousContacts) {
+    foreach (ref prev; _previousPairs) {
       bool stillActive = false;
       foreach (ref cur; current)
         if ((cur.a is prev.a && cur.b is prev.b) || (cur.a is prev.b && cur.b is prev.a)) {

@@ -198,6 +198,14 @@ int main(string[] args) {
       default: break;
     }
 
+    // Delete either selection (or file?)
+    if (IsKeyPressed(KeyboardKey.KEY_DELETE)) {
+      if (!CheckCollisionPointRec(GetMousePosition(), project)) { // if not in project view
+        activeScene.destroyObject(selected);
+        selected = null;
+      }
+    }
+    
     if (action.play) handlePlay();
 
     gizmo.mode  = cast(GizmoMode)selection.gizmo;

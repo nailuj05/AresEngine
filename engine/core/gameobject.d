@@ -54,7 +54,7 @@ class GameObject {
     version(Editor) 
       c.onEditorDestroy();
     else
-      c.onDestory();
+      c.onDestroy();
     components = components.remove(idx);
   }
 
@@ -85,8 +85,13 @@ class GameObject {
     foreach (c; components)
       c.onDestroy();
 
+    components = [];
+
     foreach (c; transform.children)
       c.gameObject.destroy();
+
+    if (transform.parent !is null)
+      transform.parent.removeChild(transform);
   }
 
   version(Editor) {
@@ -103,9 +108,14 @@ class GameObject {
     void editorDestroy() {
       foreach (c; components)
         c.onEditorDestroy();
-      
+
+      components = [];
+    
       foreach (c; transform.children)
         c.gameObject.editorDestroy();
+
+      if (transform.parent !is null)
+        transform.parent.removeChild(transform);
     }
   }
 }

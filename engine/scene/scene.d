@@ -28,9 +28,13 @@ class Scene {
     return go;
   }
 
-  void destoryObject(GameObject go) {
-    go.destroy();
-    roots = remove!(x => x is go)(roots);
+  void destroyObject(GameObject go) {
+    version(Editor) {
+      go.editorDestroy();
+    } else {
+      go.destroy();
+    }
+    roots = remove!(x => x is go.transform)(roots);
   }
 
   void start() {

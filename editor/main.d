@@ -27,6 +27,7 @@ import editor.filedialog;
 import editor.settingsdialog;
 import editor.colorpickerdialog;
 import editor.editorcamera;
+import editor.project.project;
 import editor.viewport.gizmos;
 import editor.viewport.viewport;
 import editor.inspector.inspector;
@@ -35,7 +36,7 @@ import editor.inspector.drawer : colorPicker;
 
 // Comp-time embedded assets
 static immutable ubyte[] FONT_DATA  = cast(immutable ubyte[]) import("fonts/Inter.ttf");
-static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("logo/logo-icon.png");
+static immutable ubyte[] LOGO_DATA  = cast(immutable ubyte[]) import("logo/logo-icon.png");
 
 // Project
 private string   projectPath;
@@ -130,12 +131,12 @@ int main(string[] args) {
 
   Font font = LoadFontFromMemory(".ttf", FONT_DATA.ptr, cast(int)FONT_DATA.length, TEXT_SZ, null, 0);
   GuiSetFont(font);
-  Image icon = LoadImageFromMemory(".png", ICON_DATA.ptr, cast(int)ICON_DATA.length);
-  SetWindowIcon(icon);
+  Image logo = LoadImageFromMemory(".png", LOGO_DATA.ptr, cast(int)LOGO_DATA.length);
+  SetWindowIcon(logo);
   setDarkTheme();
 
-  Rectangle topBar, hierarchy, viewport, inspector, folder;
-  computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
+  Rectangle topBar, hierarchy, viewport, inspector, project;
+  computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, project);
 
   sceneTarget = LoadRenderTexture(cast(int)viewport.width, cast(int)viewport.height);
   scope(exit) UnloadRenderTexture(sceneTarget);
@@ -155,10 +156,12 @@ int main(string[] args) {
   activeScene.editorStart();
   log("Editor Start");
 
+  initProject(projectPath);
+  
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();
 
-    computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, folder);
+    computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, project);
 
     if (!fileDialog.active && !settingsDialog.active && !colorPicker.active && !gizmo.dragging)
       updateEditorCamera(editorCam, viewport);
@@ -177,7 +180,7 @@ int main(string[] args) {
       drawHierarchy(hierarchy, activeScene, selected);
       auto selection = drawViewport(viewport, sceneTarget);
       drawInspector(inspector, selected, inspectorState);
-      drawFolder(folder);
+      drawProject(project);
       GuiSetState(GuiState.STATE_NORMAL);
       auto action = drawTopBar(topBar, activeScene.name);
       
@@ -201,6 +204,8 @@ int main(string[] args) {
     gizmo.space = cast(GizmoSpace)selection.space;
   }
 
+  unloadProject();
+  
   close_luaruntime();
 
   saveScene(activeScene, activeScene.name ~ ".json");
@@ -227,11 +232,6 @@ void renderScene(Scene scene) {
 void resizeSceneTarget(ref RenderTexture2D target, int w, int h) {
     UnloadRenderTexture(target);
     target = LoadRenderTexture(w, h);
-}
-
-void drawFolder(Rectangle r) {
-  DrawRectangle(cast(int)r.x, cast(int)r.y, cast(int)r.width, cast(int)r.height, GetColor(PANEL_BG));
-  GuiPanel(r, "Project Folder");
 }
 
 // Todo save project instead of scene here

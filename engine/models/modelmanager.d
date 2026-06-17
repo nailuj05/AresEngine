@@ -1,7 +1,10 @@
 module engine.models.modelmanager;
+
 import std.string;
 import std.algorithm : startsWith;
+
 import raylib;
+
 import engine.models.model;
 
 class ModelManager {

@@ -12,8 +12,6 @@ struct ModelAsset {
   MeshGroup[]  meshGroups;
   Material[]   materials;
   int          refCount;
-
-  // expand with animation data later
 }
 
 struct ModelHandle {

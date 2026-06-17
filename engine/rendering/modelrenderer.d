@@ -1,10 +1,10 @@
 module engine.rendering.modelrenderer;
-
 import raylib;
-
 import engine.asset;
 import engine.models.model;
 import engine.models.modelmanager;
+import engine.materials.material;
+import engine.materials.materialmanager;
 import engine.core.component;
 
 class ModelRenderer : Component {
@@ -12,35 +12,33 @@ class ModelRenderer : Component {
 
   @Asset(AssetKind.Model) string modelPath;
 
-  // per-material-slot overrides; shorter than asset.materials = no override for that slot
-  Material[] materialOverrides;
-
-  private ModelHandle _handle;
-
-  @property ModelHandle handle() { return _handle; }
+  private ModelHandle    _modelHandle;
+  private MaterialHandle[] _matHandles; // one per mesh group, all default on start
 
   override void onStart() {
-    _handle = ModelManager.instance.acquire(modelPath);
+    _modelHandle = ModelManager.instance.acquire(modelPath);
+    auto asset   = ModelManager.instance.get(_modelHandle);
+    _matHandles.length = asset.meshGroups.length;
+    foreach (ref h; _matHandles)
+      h = MaterialManager.instance.defaultMaterial();
   }
 
   override void onDraw() {
-    if (!_handle) return;
-    auto asset = ModelManager.instance.get(_handle);
-    foreach (i, ref g; asset.meshGroups) {
-      Material mat = resolveMaterial(asset, g.materialIndex);
+    if (!_modelHandle) return;
+    auto modelAsset = ModelManager.instance.get(_modelHandle);
+    foreach (i, ref g; modelAsset.meshGroups) {
+      auto matAsset = MaterialManager.instance.get(_matHandles[i]);
+      Material mat  = matAsset.raylibMaterial;
       DrawMesh(g.mesh, mat, owner.transform.worldMatrix());
     }
   }
 
   override void onDestroy() {
-    ModelManager.instance.release(_handle);
-    _handle = ModelHandle.init;
-  }
-
-  private Material resolveMaterial(ModelAsset* asset, int slot) {
-    if (slot < materialOverrides.length)
-      return materialOverrides[slot];
-    return asset.materials[slot];
+    foreach (ref h; _matHandles)
+      MaterialManager.instance.release(h);
+    _matHandles = null;
+    ModelManager.instance.release(_modelHandle);
+    _modelHandle = ModelHandle.init;
   }
 
   void reload() {
@@ -57,17 +55,12 @@ class ModelRenderer : Component {
     import editor.inspector.drawer;
     override void onEditorStart()   { onStart(); }
     override void onEditorDestroy() { onDestroy(); }
-
     private FieldState[string] fieldStates;
     override float drawInspector(float offsetX, float offsetY, float panelW) {
       auto self = this;
       float endY = 0.0f;
-      if (drawFields(self, fieldStates, offsetX, offsetY, panelW, &endY)) {
-        // reload on change
-        import std.stdio;
-        writeln("changed");
+      if (drawFields(self, fieldStates, offsetX, offsetY, panelW, &endY))
         reload();
-      }
       return endY;
     }
   }

@@ -19,6 +19,7 @@ import engine.rendering.camera : Camera;
 import engine.rendering.modelrenderer;
 import engine.scripting.luaruntime;
 import engine.models.modelmanager;
+import engine.materials.materialmanager;
 import engine.oscillator;
 
 import editor.style;
@@ -159,6 +160,8 @@ int main(string[] args) {
   setActiveScene(activeScene);
 
   // modelmanager needs to be initialized before scene start
+  MaterialManager.init(projectPath);
+  
   ModelManager.init(projectPath);
   ModelManager.instance.loadAllAssets(); // a bit ugly, but fine for this engine
   
@@ -232,6 +235,8 @@ int main(string[] args) {
   activeScene.editorDestroy();
   ModelManager.instance.unloadAll();
   ModelManager.instance.shutdown();
+
+  MaterialManager.instance.shutdown();
 
   saveManifest();
 

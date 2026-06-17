@@ -26,7 +26,7 @@ class LuaScript : Component, IExtraSerializable {
   }
 
   // D-side value store
-  LuaFieldValue[] fieldValues;
+  LuaFieldValue[] fieldValues = [];
 
   private LuaScriptDef def;
   private int instanceRef = LUA_NOREF;
@@ -241,7 +241,7 @@ class LuaScript : Component, IExtraSerializable {
       offsetY += 28;
 
       auto self = this;
-      offsetY = drawFields(self, fieldStates, offsetX, offsetY, panelW);
+      drawFields(self, fieldStates, offsetX, offsetY, panelW, &offsetY);
       if (!def) return offsetY;
 
       if (fieldStates.length != def.fields.length)

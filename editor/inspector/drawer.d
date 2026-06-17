@@ -6,12 +6,17 @@ import raygui;
 import std.format : format;
 import std.string : join, toStringz, fromStringz;
 import std.conv   : to;
-import std.traits : hasUDA;
+import std.traits : hasUDA, getUDAs;
 
+import engine.asset;
+import engine.models.model;
+import engine.models.modelmanager: ModelManager;
 import engine.core.component;
 import editor.dialog.colorpicker;
+import editor.dialog.assetpicker;
 
 ColorPickerDialog colorPicker;
+AssetPickerDialog!ModelEntry modelPicker;
 
 enum MAX_FIELD_BUFFER = 256;
 enum float LABEL_W    = 120;
@@ -21,6 +26,20 @@ enum float ROW_H      = 28;
 struct FieldState {
   char[MAX_FIELD_BUFFER] buffer = 0;
   bool editing;
+}
+
+// Pointer to writeback field
+private string* pendingAssetField;
+bool drawAssetPickers() {
+  bool changed = false;
+  if (modelPicker.draw() && !modelPicker.cancelled) {
+    if (pendingAssetField) {
+      *pendingAssetField = modelPicker.result.path;
+      changed = true;
+    }
+    pendingAssetField = null;
+  }
+  return changed;
 }
 
 private void syncBuffer(T)(ref FieldState s, T value) {
@@ -37,7 +56,7 @@ private void syncBuffer(T)(ref FieldState s, T value) {
 private bool textBoxRow(ref FieldState s, Rectangle r) {
   if (GuiTextBox(r, s.buffer.ptr, MAX_FIELD_BUFFER, s.editing)) {
     s.editing = !s.editing;
-    return !s.editing; // true = just committed
+    return !s.editing;
   }
   return false;
 }
@@ -96,27 +115,27 @@ bool drawEulerField(string label, ref Quaternion q, ref FieldState[3] fs, float 
       q = QuaternionFromEuler(ex, ey, ez);
     } catch (Exception) {}
   }
-  return changed; // fixed: was unconditionally returning true
+  return changed;
 }
 
-// Non-template overload so drawFields can pass FieldState[3] without ambiguity.
-// deferred omitted: vec3 fields are never dropdowns.
-void drawField(string label, ref Vector3 value, ref FieldState[3] state, float ox, float oy, float pw) {
-  drawVec3Field(label, value, state, ox, oy, pw);
+bool drawField(string label, ref Vector3 value, ref FieldState[3] state, float ox, float oy, float pw) {
+  return drawVec3Field(label, value, state, ox, oy, pw);
 }
 
-void drawField(T)(string label, ref T value, ref FieldState state, float ox, float oy, float pw,
-    void delegate()* deferred = null)
-{
+bool drawField(T)(string label, ref T value, ref FieldState state, float ox, float oy, float pw, bool delegate()* deferred = null) {
   syncBuffer(state, value);
-  Rectangle lr = Rectangle(ox + 8,               oy, LABEL_W,              FIELD_H);
-  Rectangle fr = Rectangle(ox + 8 + LABEL_W + 4, oy, pw - LABEL_W - 20,   FIELD_H);
+  Rectangle lr = Rectangle(ox + 8,               oy, LABEL_W,            FIELD_H);
+  Rectangle fr = Rectangle(ox + 8 + LABEL_W + 4, oy, pw - LABEL_W - 20, FIELD_H);
   GuiLabel(lr, label.humanize().toStringz());
 
   static if (is(T == bool)) {
+    T old = value;
     GuiCheckBox(Rectangle(fr.x, oy, FIELD_H, FIELD_H), "".toStringz, &value);
-
-  } else static if (is(T == float) || is(T == int)) {
+    return value != old;
+  }
+  else static if (is(T == float) || is(T == int)) {
+    // Return true on the frame editing transitions to committed (wasEditing && !state.editing).
+    bool wasEditing = state.editing;
     if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
     if (!state.editing) {
@@ -125,14 +144,17 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
         else                        value = to!int  (fromStringz(state.buffer.ptr));
       } catch (Exception) {}
     }
-
-  } else static if (is(T == string)) {
+    return wasEditing && !state.editing;
+  }
+  else static if (is(T == string)) {
+    bool wasEditing = state.editing;
     if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
-
-  } else static if (is(T == Color)) {
+    return wasEditing && !state.editing;
+  }
+  else static if (is(T == Color)) {
     DrawRectangleRec(fr, value);
     DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
     if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), fr))
@@ -140,9 +162,11 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
     if (colorPicker.hasResult) {
       value = colorPicker.result;
       colorPicker.hasResult = false;
+      return true;
     }
-
-  } else static if (is(T == enum)) {
+    return false;
+  }
+  else static if (is(T == enum)) {
     import std.traits : EnumMembers;
     enum opts = [__traits(allMembers, T)].join(";");
     int active = 0;
@@ -150,32 +174,40 @@ void drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
       if (value == m) active = cast(int) i;
     if (state.editing && deferred) {
       *deferred = () {
-        if (GuiDropdownBox(fr, opts.ptr, &active, true))
+        // Return true when the user commits a selection (GuiDropdownBox fires in open mode).
+        bool committed = false;
+        if (GuiDropdownBox(fr, opts.ptr, &active, true)) {
           state.editing = false;
+          committed = true;
+        }
         static foreach (i, m; EnumMembers!T)
           if (active == cast(int) i) value = m;
+        return committed;
       };
-    } else {
+    }
+    else {
       if (GuiDropdownBox(fr, opts.ptr, &active, false))
         state.editing = true;
     }
+    return false;
   }
+  return false;
 }
 
-// Returns y position after the last drawn row.
-// NOTE: requires Component.drawInspector(float, float, float) : float
-float drawFields(T)(ref T obj, ref FieldState[string] states, float ox, float oy, float pw) {
+// Returns true if any field was modified this frame.
+// Pass endY to receive the y position after the last drawn row.
+bool drawFields(T)(ref T obj, ref FieldState[string] states, float ox, float oy, float pw, float* endY = null) {
   float y = oy;
-  void delegate() deferred = null;
+  bool changed = false;
+  bool delegate() deferred = null;
 
   foreach (i, ref field; obj.tupleof) {
     static if (__traits(getProtection, obj.tupleof[i]) == "public"
-        && !hasUDA!(obj.tupleof[i], DontSerialize)) {
-      enum name      = __traits(identifier, obj.tupleof[i]);
+               && !hasUDA!(obj.tupleof[i], DontSerialize)) {
+      enum name     = __traits(identifier, obj.tupleof[i]);
       alias FieldType = typeof(field);
 
       static if (is(FieldType == Vector3)) {
-        // Subkeys are compile-time constants, so no runtime overhead beyond the AA lookup.
         enum kx = name ~ ".x";
         enum ky = name ~ ".y";
         enum kz = name ~ ".z";
@@ -183,20 +215,45 @@ float drawFields(T)(ref T obj, ref FieldState[string] states, float ox, float oy
         if (ky !in states) states[ky] = FieldState.init;
         if (kz !in states) states[kz] = FieldState.init;
         FieldState[3] fs = [states[kx], states[ky], states[kz]];
-        drawField(name, field, fs, ox, y, pw);
+        if (drawField(name, field, fs, ox, y, pw)) changed = true;
         states[kx] = fs[0];
         states[ky] = fs[1];
         states[kz] = fs[2];
-      } else {
+      }
+      else static if (hasUDA!(obj.tupleof[i], Asset)) {
+        enum assetKind = getUDAs!(obj.tupleof[i], Asset)[0].kind;
+        if (name !in states) states[name] = FieldState.init; 
+        // Draw label + read-only path + "..." button
+        Rectangle lr  = Rectangle(ox + 8,               y, LABEL_W,               FIELD_H);
+        Rectangle fr  = Rectangle(ox + LABEL_W - 4,     y, pw - LABEL_W - 28,     FIELD_H);
+        Rectangle btn = Rectangle(fr.x + fr.width + 4,  y, 20,                    FIELD_H);
+ 
+        GuiLabel(lr, name.humanize().toStringz());
+        GuiLabel(fr, field.length ? field.toStringz() : "<none>".toStringz());
+        DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
+ 
+        if (GuiButton(btn, "...".toStringz())) {
+          static if (assetKind == AssetKind.Model) {
+            pendingAssetField = &field;
+            modelPicker.show("Pick Model",
+                             ModelManager.instance.availableModels(),
+                             (const ref ModelEntry e) => format!"%d mesh(es)"(e.meshCount));
+          }
+          // add other kinds here as managers become available
+        }
+        changed = drawAssetPickers();
+      }
+      else {
         if (name !in states) states[name] = FieldState.init;
-        drawField(name, field, states[name], ox, y, pw, &deferred);
+        if (drawField(name, field, states[name], ox, y, pw, &deferred)) changed = true;
       }
 
       y += ROW_H;
     }
   }
-  if (deferred) deferred();
-  return y;
+  if (deferred && deferred()) changed = true;
+  if (endY) *endY = y;
+  return changed;
 }
 
 string humanize(string s) {

@@ -40,7 +40,9 @@ class SphereCollider : Collider {
     
     override float drawInspector(float offsetX, float offsetY, float panelW) {
       auto self = this;
-      return drawFields(self, fieldStates, offsetX, offsetY, panelW);
+      float endY = 0.0f;
+      drawFields(self, fieldStates, offsetX, offsetY, panelW, &endY);
+      return endY;
     }
   }
 } 

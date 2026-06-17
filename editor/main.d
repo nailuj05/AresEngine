@@ -16,8 +16,9 @@ import engine.core.gameobject;
 import engine.scene.scene;
 import engine.scene.loader;
 import engine.rendering.camera : Camera;
-import engine.rendering.meshrenderer;
+import engine.rendering.modelrenderer;
 import engine.scripting.luaruntime;
+import engine.models.modelmanager;
 import engine.oscillator;
 
 import editor.style;
@@ -32,7 +33,7 @@ import editor.viewport.gizmos;
 import editor.viewport.viewport;
 import editor.inspector.inspector;
 import editor.hierarchy.hierarchy;
-import editor.inspector.drawer : colorPicker; 
+import editor.inspector.drawer : colorPicker, modelPicker; 
 
 // Comp-time embedded assets
 static immutable ubyte[] FONT_DATA  = cast(immutable ubyte[]) import("fonts/Inter.ttf");
@@ -66,6 +67,7 @@ void log(T...)(T args) {
 }
 
 int main(string[] args) {
+  // Argparse and init/load
   bool help, newp, profile;
   getopt(args, "help|h", &help, "new|n", &newp, "profile|p", &profile);
 
@@ -74,61 +76,63 @@ int main(string[] args) {
     return 0;
   }
 
- if (newp) {
-   if (args.length < 2) {
-     log("error: missing path");
-     return 1;
-   }
-   projectPath = absolutePath(args[1]);
-   chdir(projectPath);
-   projectManifest.projectName    = "New Project";
-   projectManifest.projectVersion = VERSION;
-   activeScene = new Scene("main");
-   saveScene(activeScene, "main.json");
-   projectManifest.projectScenes["main"] = "main.json";
-   saveManifest();
-   log("Created new project in ", projectPath);
- } else {
-   if (args.length < 2) {
-     log("error: missing project path");
-     return 1;
-   }
+  if (newp) {
+    if (args.length < 2) {
+      log("error: missing path");
+      return 1;
+    }
+    projectPath = absolutePath(args[1]);
+    chdir(projectPath);
+    projectManifest.projectName    = "New Project";
+    projectManifest.projectVersion = VERSION;
+    activeScene = new Scene("main");
+    saveScene(activeScene, "main.json");
+    projectManifest.projectScenes["main"] = "main.json";
+    saveManifest();
+    log("Created new project in ", projectPath);
+  } else {
+    if (args.length < 2) {
+      log("error: missing project path");
+      return 1;
+    }
 
-   projectPath = absolutePath(args[1]);
+    projectPath = absolutePath(args[1]);
 
-   if (!isDir(projectPath)) {
-     log("Error with project path: ", projectPath);
-     return 1;
-   }
+    if (!isDir(projectPath)) {
+      log("Error with project path: ", projectPath);
+      return 1;
+    }
 
-   if (!exists(projectPath ~ "/manifest.json")) {
-     log("Manifest file not found in ", projectPath);
-     return 1;
-   }
+    if (!exists(projectPath ~ "/manifest.json")) {
+      log("Manifest file not found in ", projectPath);
+      return 1;
+    }
 
-   Manifest loadedManifest;
-   try {
-     loadedManifest = Manifest(readText(projectPath ~ "/manifest.json"));
-   } catch (Exception e) {
-     log("Error parsing manifest file ", projectPath ~ "/manifest.json", "\n", e.toString());
-     return 1;
-   }
+    Manifest loadedManifest;
+    try {
+      loadedManifest = Manifest(readText(projectPath ~ "/manifest.json"));
+    } catch (Exception e) {
+      log("Error parsing manifest file ", projectPath ~ "/manifest.json", "\n", e.toString());
+      return 1;
+    }
 
-   if (compareVersion(loadedManifest.projectVersion, VERSION) > 0) {
-     log(format("Project version (%s) is newer than editor version (%s)",
-                loadedManifest.projectVersion, VERSION));
-     return 1;
-   }
+    if (compareVersion(loadedManifest.projectVersion, VERSION) > 0) {
+      log(format("Project version (%s) is newer than editor version (%s)",
+                 loadedManifest.projectVersion, VERSION));
+      return 1;
+    }
 
-   log("Opening project ", loadedManifest.projectName, " at ", projectPath);
-   projectManifest = loadedManifest;
-   chdir(projectPath);
- }
+    log("Opening project ", loadedManifest.projectName, " at ", projectPath);
+    projectManifest = loadedManifest;
+    chdir(projectPath);
+  }
 
+  // Raylib Init
   SetTraceLogLevel(TraceLogLevel.LOG_WARNING);
   initWindow(WindowConfig(1920, 1080, "AresEngine - Editor", 60));
   scope(exit) closeWindow();
 
+  // UI Setup
   Font font = LoadFontFromMemory(".ttf", FONT_DATA.ptr, cast(int)FONT_DATA.length, TEXT_SZ, null, 0);
   GuiSetFont(font);
   Image logo = LoadImageFromMemory(".png", LOGO_DATA.ptr, cast(int)LOGO_DATA.length);
@@ -143,6 +147,7 @@ int main(string[] args) {
 
   editorCam = createEditorCamera();
 
+  // Load Scene
   string mainScene = projectManifest.projectScenes["main"];
   if (mainScene == "") {
     log("Project has no main scene");
@@ -153,6 +158,10 @@ int main(string[] args) {
 
   setActiveScene(activeScene);
 
+  // modelmanager needs to be initialized before scene start
+  ModelManager.init(projectPath);
+  ModelManager.instance.loadAllAssets(); // a bit ugly, but fine for this engine
+  
   activeScene.editorStart();
   log("Editor Start");
 
@@ -163,7 +172,7 @@ int main(string[] args) {
 
     computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, project);
 
-    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active && !gizmo.dragging)
+    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active && !modelPicker.active && !gizmo.dragging)
       updateEditorCamera(editorCam, viewport);
 
     if (viewport.width != sceneTarget.texture.width || viewport.height != sceneTarget.texture.height)
@@ -175,34 +184,35 @@ int main(string[] args) {
     renderScene(activeScene);
 
     BeginDrawing();
-      ClearBackground(Colors.BLACK);
-      if (activeMenu >= 0) GuiSetState(GuiState.STATE_DISABLED);
-      drawHierarchy(hierarchy, activeScene, selected);
-      auto selection = drawViewport(viewport, sceneTarget);
-      drawInspector(inspector, selected, inspectorState);
-      drawProject(project);
-      GuiSetState(GuiState.STATE_NORMAL);
-      auto action = drawTopBar(topBar, activeScene.name);
+    ClearBackground(Colors.BLACK);
+    if (activeMenu >= 0) GuiSetState(GuiState.STATE_DISABLED);
+    drawHierarchy(hierarchy, activeScene, selected);
+    auto selection = drawViewport(viewport, sceneTarget);
+    drawInspector(inspector, selected, inspectorState);
+    drawProject(project);
+    GuiSetState(GuiState.STATE_NORMAL);
+    auto action = drawTopBar(topBar, activeScene.name);
       
-      drawSettingsDialog(settingsDialog);
-      drawFileDialog(fileDialog);
-      drawColorPickerDialog();
+    drawSettingsDialog(settingsDialog);
+    drawFileDialog(fileDialog);
+    drawColorPickerDialog();
 
-      if (profile) DrawFPS(GetScreenWidth() - 100, 2);
+    if (profile) DrawFPS(GetScreenWidth() - 100, 2);
     EndDrawing();
 
     switch (action.menu) {
-      case 0: handleProject(action.item);    break;
-      case 1: handleScene(action.item);      break;
-      case 2: handleGameObject(action.item); break;
-      default: break;
+    case 0: handleProject(action.item);    break;
+    case 1: handleScene(action.item);      break;
+    case 2: handleGameObject(action.item); break;
+    default: break;
     }
 
     // Delete either selection (or file?)
     if (IsKeyPressed(KeyboardKey.KEY_DELETE)) {
       if (!CheckCollisionPointRec(GetMousePosition(), project)) { // if not in project view
-        activeScene.destroyObject(selected);
-        selected = null;
+        if (selected !is null)
+          activeScene.destroyObject(selected);
+        selected = activeScene.roots.length > 0 ? activeScene.roots[0].gameObject : null;
       }
     }
     
@@ -216,8 +226,13 @@ int main(string[] args) {
   
   close_luaruntime();
 
+  // TODO: Proper "close without saving?" dialog
   saveScene(activeScene, activeScene.name ~ ".json");
+  
   activeScene.editorDestroy();
+  ModelManager.instance.unloadAll();
+  ModelManager.instance.shutdown();
+
   saveManifest();
 
   return 0;
@@ -227,19 +242,19 @@ void renderScene(Scene scene) {
   BeginTextureMode(sceneTarget);
   ClearBackground(Color(60, 60, 60, 255));
   BeginMode3D(editorCam);
-    DrawGrid(20, 1.0f);
-    scene.draw();
-    if (selected !is null) {
-      drawGizmo(gizmo, selected.transform.position, selected.transform.rotation, editorCam);
-    }
+  DrawGrid(20, 1.0f);
+  scene.draw();
+  if (selected !is null) {
+    drawGizmo(gizmo, selected.transform.position, selected.transform.rotation, editorCam);
+  }
     
   EndMode3D();
   EndTextureMode();
 }
 
 void resizeSceneTarget(ref RenderTexture2D target, int w, int h) {
-    UnloadRenderTexture(target);
-    target = LoadRenderTexture(w, h);
+  UnloadRenderTexture(target);
+  target = LoadRenderTexture(w, h);
 }
 
 // Todo save project instead of scene here
@@ -279,32 +294,37 @@ void drawColorPickerDialog() {
     colorPicker.draw();
   }
 }
-      
+
 // TopBar Handlers
 void handleProject(int item) {
   switch (item) {
-    case 0: /*Save    */ saveManifest(); break;
-    case 1: /*Settings*/ settingsDialog.show(projectManifest); break;
-    case 2: /*Exit    */ exitRequested = true; break;
+  case 0: /*Save    */ saveManifest(); break;
+  case 1: /*Settings*/ settingsDialog.show(projectManifest); break;
+  case 2: /*Exit    */ exitRequested = true; break;
   default: break;
   }
 }
 
 void handleScene(int item) {
   switch (item) {
-    case 0: /*New    */ break; // TODO: New Scene
-    case 1: /*Open   */ fileDialog.show(FileDialogMode.Open, "", ".json"); break; 
-    case 2: /*Save   */ saveScene(activeScene, projectPath ~ "/" ~ activeScene.name ~ ".json"); break; 
-    case 3: /*Save As*/ fileDialog.show(FileDialogMode.Save, "", ".json"); break; 
+  case 0: /*New    */ break; // TODO: New Scene
+  case 1: /*Open   */ fileDialog.show(FileDialogMode.Open, "", ".json"); break; 
+  case 2: /*Save   */ saveScene(activeScene, projectPath ~ "/" ~ activeScene.name ~ ".json"); break; 
+  case 3: /*Save As*/ fileDialog.show(FileDialogMode.Save, "", ".json"); break; 
   default: break;
   }
 }
 
 void handleGameObject(int item) {
   switch (item) {
-    case 0: /*Add Empty */ activeScene.createObject("Empty"); break;
-    case 1: /*Add Cube  */ activeScene.createObject("Cube").addComponent!MeshRenderer().onStart(); break;
-    case 2: /*Add Camera*/ activeScene.createObject("Camera").addComponent!Camera(); break;
+  case 0: /*Add Empty */ activeScene.createObject("Empty"); break;
+  case 1: /*Add Cube  */
+    auto cube = activeScene.createObject("Cube");
+    auto mr   = cube.addComponent!ModelRenderer();
+    mr.modelPath = "primitive://cube";
+    mr.reload();
+    break;
+  case 2: /*Add Camera*/ activeScene.createObject("Camera").addComponent!Camera(); break;
   default: break;
   }
 }

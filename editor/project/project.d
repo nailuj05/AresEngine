@@ -15,6 +15,7 @@ static immutable ubyte[] ICON_FILE    = cast(immutable ubyte[]) import("icons/fi
 static immutable ubyte[] ICON_FOLDER  = cast(immutable ubyte[]) import("icons/folder.png");
 static immutable ubyte[] ICON_SCRIPT  = cast(immutable ubyte[]) import("icons/script.png");
 static immutable ubyte[] ICON_TEXTURE = cast(immutable ubyte[]) import("icons/texture.png");
+// TODO: Add model icon
 
 private enum PAD         = 4;
 private enum HEADER      = 28;
@@ -27,6 +28,7 @@ private enum THUMB_SIZE  = 32;   // icon rendered size
 private enum LABEL_H     = 20;   // text row below icon
 private enum LABEL_SZ    = 20;
 private immutable string[] TEXTURE_EXTS = [".png", ".jpg", ".jpeg"];
+private immutable string[] MODEL_EXTS = [".obj", ".glb", ".gltf"];
 
 private Texture2D iconFile;
 private Texture2D iconFolder;
@@ -124,7 +126,7 @@ private string truncateLabel(string s, int maxWidth) {
   if (MeasureText(s.toStringz(), TEXT_SZ) <= maxWidth) return s;
   while (s.length > 0) {
     s = s[0 .. $ - 1];
-    if (MeasureText((s ~ "~").toStringz(), TEXT_SZ) <= maxWidth) return s ~ "~";
+    if (MeasureText((s ~ "..").toStringz(), TEXT_SZ) <= maxWidth) return s ~ "..";
   }
   return "~";
 }

@@ -1,6 +1,8 @@
-module editor.settingsdialog;
+module editor.dialog.settings;
+
 import raylib;
 import raygui;
+
 import std.algorithm : clamp;
 import std.string    : fromStringz, toStringz;
 import engine.manifest;

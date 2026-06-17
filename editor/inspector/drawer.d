@@ -9,9 +9,8 @@ import std.conv   : to;
 import std.traits : hasUDA;
 
 import engine.core.component;
-import editor.colorpickerdialog;
+import editor.dialog.colorpicker;
 
-// Module-level singleton is intentional; only one color dialog can be open at a time.
 ColorPickerDialog colorPicker;
 
 enum MAX_FIELD_BUFFER = 256;

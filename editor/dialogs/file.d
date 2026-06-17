@@ -1,4 +1,4 @@
-module editor.filedialog;
+module editor.dialog.file;
 
 import raylib;
 import raygui;

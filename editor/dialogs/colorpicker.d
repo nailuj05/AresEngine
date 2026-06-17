@@ -1,4 +1,4 @@
-module editor.colorpickerdialog;
+module editor.dialog.colorpicker;
 
 import raylib;
 import raygui;

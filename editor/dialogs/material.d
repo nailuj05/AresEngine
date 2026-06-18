@@ -19,14 +19,6 @@ import editor.editorcamera;
 import editor.style;
 import editor.inspector.drawer;  // FieldState, drawField, drawFields, ROW_H, FIELD_H, LABEL_W
 
-// ----------------------------------------------------------------------------
-// MaterialDialog
-//
-// Floating window split 2/3 (3D preview) | 1/3 (uniform inspector).
-// Open via show(path). One instance open at a time (singleton via s_open).
-// draw() returns true on the frame the window closes.
-// ----------------------------------------------------------------------------
-
 private enum WIN_W    = 820.0f;
 private enum WIN_H    = 560.0f;
 private enum HEADER   = 24;
@@ -35,7 +27,6 @@ private enum BTN_H    = 28;
 private enum BTN_W    = 96;
 private enum SB_W     = 12;
 
-// Preview primitive
 private enum Primitive { Cube, Sphere }
 
 struct MaterialDialog {

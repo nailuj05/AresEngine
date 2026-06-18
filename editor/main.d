@@ -63,6 +63,7 @@ private bool exitRequested;
 
 enum TOP_BAR_SIZE = 24;
 
+// TODO: Proper logging, logfile, console 
 void log(T...)(T args) {
   import std.stdio : write, writeln;
   write("[AresEditor] ");

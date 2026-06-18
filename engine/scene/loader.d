@@ -13,6 +13,10 @@ import engine.core.component;
 import engine.core.transform;
 import engine.core.iextraserializable;
 
+// -------------------------------------------------------------------------------------- //
+// TODO: pull out the general serialization functions into a proper serialization package //
+// -------------------------------------------------------------------------------------- //
+
 template isSerializableField(T) {
     enum isSerializableField = is(T == bool)
                             || is(T == float)
@@ -23,8 +27,6 @@ template isSerializableField(T) {
 }
 
 // public API
-
-
 void saveScene(Scene scene, string path) {
   writefln("saving scene %s", scene.name);
   JSONValue[] roots;

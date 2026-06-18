@@ -3,8 +3,9 @@ module editor.style;
 import raylib;
 import raygui;
 
-enum PANEL_BG    = 0X252526FF;
+enum PANEL_BG    = 0x252526FF;
 enum TEXT_SZ     = 20;
+enum COL_ACCENT  = 0xF54927FF;
 
 
 void DrawGuiText(immutable(char*) text, int x, int y, int fs, Color color) {

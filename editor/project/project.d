@@ -44,6 +44,9 @@ private Vector2    scroll;
 private double     lastClickTime = -1.0;
 private int        lastClickIdx  = -1;
 
+string getCurrentProjectPath() {
+  return currentPath;
+}
 
 void initProject(string projectPath) {
   if (iconsLoaded) return;
@@ -77,6 +80,10 @@ void unloadProject() {
   UnloadTexture(iconScript);
   UnloadTexture(iconTexture);
   iconsLoaded = false;
+}
+
+void reloadProjectView() {
+  navigateTo(currentPath);
 }
 
 // navigation
@@ -138,8 +145,10 @@ private int contentHeight(int cols) {
 }
 
 // drawing
-void drawProject(Rectangle panel) {
+string drawProject(Rectangle panel) {
   assert(iconsLoaded);
+
+  string inspect = "";
 
   DrawRectangle(cast(int)panel.x, cast(int)panel.y, cast(int)panel.width, cast(int)panel.height, GetColor(PANEL_BG));
   GuiPanel(panel, "Project");
@@ -207,8 +216,11 @@ void drawProject(Rectangle panel) {
     // interaction
     if (hovered && IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT)) {
       double now = GetTime();
-      if (e.isDir && lastClickIdx == cast(int)i && now - lastClickTime < 0.35) {
-        navigateTo(e.name);  // double-click: enter folder
+      if (lastClickIdx == cast(int)i && now - lastClickTime < 0.35) { // double click
+        if (e.isDir)
+          navigateTo(e.name);  // enter folder
+        else
+          inspect = e.name; // inspect 
       } else {
         selectedIdx   = cast(int)i;
         lastClickIdx  = cast(int)i;
@@ -217,13 +229,13 @@ void drawProject(Rectangle panel) {
     }
 
     // cell background
-    Color bg = (selectedIdx == cast(int)i) ? GetColor(0x5F5F5CFF)
-             : hovered                      ? GetColor(0x3A3A3AFF)
-             :                                Colors.BLANK;
+    Color bg = (selectedIdx == cast(int)i) ? GetColor(COL_ACCENT)
+             : hovered                     ? GetColor(0x3A3A3AFF)
+             :                               Colors.BLANK;
     if (bg.a > 0) {
       DrawRectangleRec(cell, bg);
       if (selectedIdx == cast(int)i)
-        DrawRectangleRec(cell, GetColor(0x7A7AFFFF));
+        DrawRectangleRec(cell, GetColor(COL_ACCENT));
     }
 
     // icon
@@ -243,4 +255,6 @@ void drawProject(Rectangle panel) {
   }
 
   EndScissorMode();
+
+  return inspect;
 }

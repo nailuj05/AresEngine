@@ -28,6 +28,7 @@ import editor.topbar;
 import editor.dialog.file;
 import editor.dialog.settings;
 import editor.dialog.colorpicker;
+import editor.dialog.material : MaterialDialog;
 import editor.editorcamera;
 import editor.project.project;
 import editor.viewport.gizmos;
@@ -48,7 +49,7 @@ private scope Manifest projectManifest;
 private Scene           activeScene;
 private GameObject      selected;
 private RenderTexture2D sceneTarget;
-private Camera3D        editorCam;
+private EditorCamera    editorCam;
 
 // Editor
 private GizmoState gizmo;
@@ -56,6 +57,7 @@ private InspectorState inspectorState;
 
 private FileDialog fileDialog;
 private SettingsDialog settingsDialog;
+private MaterialDialog materialDialog;
 
 private bool exitRequested;
 
@@ -146,7 +148,7 @@ int main(string[] args) {
   sceneTarget = LoadRenderTexture(cast(int)viewport.width, cast(int)viewport.height);
   scope(exit) UnloadRenderTexture(sceneTarget);
 
-  editorCam = createEditorCamera();
+  editorCam = EditorCamera.create();
 
   // Load Scene
   string mainScene = projectManifest.projectScenes["main"];
@@ -175,14 +177,15 @@ int main(string[] args) {
 
     computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, project);
 
-    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active && !modelPicker.active && !gizmo.dragging)
-      updateEditorCamera(editorCam, viewport);
+    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active &&
+        !modelPicker.active && !materialDialog.active && !gizmo.dragging)
+      editorCam.update(viewport);
 
     if (viewport.width != sceneTarget.texture.width || viewport.height != sceneTarget.texture.height)
       resizeSceneTarget(sceneTarget, cast(int)viewport.width, cast(int)viewport.height);
 
     if (selected !is null)
-      updateGizmo(gizmo, viewport, editorCam, selected);
+      updateGizmo(gizmo, viewport, editorCam.cam, selected);
 
     renderScene(activeScene);
 
@@ -192,13 +195,14 @@ int main(string[] args) {
     drawHierarchy(hierarchy, activeScene, selected);
     auto selection = drawViewport(viewport, sceneTarget);
     drawInspector(inspector, selected, inspectorState);
-    drawProject(project);
+    auto inspect = drawProject(project);
     GuiSetState(GuiState.STATE_NORMAL);
     auto action = drawTopBar(topBar, activeScene.name);
       
     drawSettingsDialog(settingsDialog);
     drawFileDialog(fileDialog);
     drawColorPickerDialog();
+    drawMaterialDialog(inspect);
 
     if (profile) DrawFPS(GetScreenWidth() - 100, 2);
     EndDrawing();
@@ -207,6 +211,7 @@ int main(string[] args) {
     case 0: handleProject(action.item);    break;
     case 1: handleScene(action.item);      break;
     case 2: handleGameObject(action.item); break;
+    case 3: handleCreate(action.item);     break;
     default: break;
     }
 
@@ -233,6 +238,7 @@ int main(string[] args) {
   saveScene(activeScene, activeScene.name ~ ".json");
   
   activeScene.editorDestroy();
+
   ModelManager.instance.unloadAll();
   ModelManager.instance.shutdown();
 
@@ -246,11 +252,11 @@ int main(string[] args) {
 void renderScene(Scene scene) {
   BeginTextureMode(sceneTarget);
   ClearBackground(Color(60, 60, 60, 255));
-  BeginMode3D(editorCam);
+  BeginMode3D(editorCam.cam);
   DrawGrid(20, 1.0f);
   scene.draw();
   if (selected !is null) {
-    drawGizmo(gizmo, selected.transform.position, selected.transform.rotation, editorCam);
+    drawGizmo(gizmo, selected.transform.position, selected.transform.rotation, editorCam.cam);
   }
     
   EndMode3D();
@@ -300,6 +306,15 @@ void drawColorPickerDialog() {
   }
 }
 
+void drawMaterialDialog(string inspect) {
+  import editor.dialog.material;
+
+  if (inspect != "")
+    materialDialog.show(inspect);
+
+  materialDialog.draw();
+}
+
 // TopBar Handlers
 void handleProject(int item) {
   switch (item) {
@@ -330,6 +345,18 @@ void handleGameObject(int item) {
     mr.reload();
     break;
   case 2: /*Add Camera*/ activeScene.createObject("Camera").addComponent!Camera(); break;
+  default: break;
+  }
+}
+
+void handleCreate(int item) {
+  switch (item) {
+  case 0: /*New Material*/
+    auto mat = MaterialManager.instance.defaultMaterial();
+    MaterialManager.instance.save(mat, getCurrentProjectPath() ~ "/Material.mat");
+    MaterialManager.instance.release(mat);
+    reloadProjectView();
+    break;
   default: break;
   }
 }

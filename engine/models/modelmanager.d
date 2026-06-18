@@ -63,8 +63,10 @@ public:
   void release(ModelHandle h) {
     auto asset = h.id in _assets;
     if (!asset) return;
-    // never unload primitives via refcount
-    if (asset.sourcePath.startsWith("primitive://")) return;
+    if (asset.sourcePath.startsWith("primitive://")) {
+      asset.refCount--;
+      return;
+    }
     if (--asset.refCount == 0) unload(h.id);
   }
 

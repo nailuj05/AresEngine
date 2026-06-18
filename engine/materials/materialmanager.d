@@ -4,6 +4,7 @@ import std.string;
 import std.algorithm : startsWith;
 import std.json;
 import std.file  : readText, write;
+import std.conv;
 
 import raylib;
 
@@ -38,7 +39,7 @@ public:
     foreach (id, ref asset; _assets) {
       int expectedRef = asset.sourcePath.startsWith("builtin://") ? 1 : 0;
       if (asset.refCount > expectedRef)
-        assert(false, "Material (" ~ asset.sourcePath ~ ") refCount not zero (component leak)");
+        assert(false, "Material (" ~ asset.sourcePath ~ ") refCount not " ~ to!string(expectedRef) ~ " (component leak)");
       UnloadMaterial(asset.raylibMaterial);
     }
     _assets    = null;
@@ -64,7 +65,10 @@ public:
   void release(MaterialHandle h) {
     auto asset = h.id in _assets;
     if (!asset) return;
-    if (asset.sourcePath.startsWith("builtin://")) return;
+    if (asset.sourcePath.startsWith("builtin://")) {
+      asset.refCount--; // decrement but never unload
+      return;
+    }
     if (--asset.refCount == 0) unload(h.id);
   }
 

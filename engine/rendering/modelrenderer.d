@@ -1,5 +1,10 @@
 module engine.rendering.modelrenderer;
+
+import std.string : toStringz;
+
 import raylib;
+import raygui;
+
 import engine.asset;
 import engine.models.model;
 import engine.models.modelmanager;
@@ -14,26 +19,28 @@ class ModelRenderer : Component {
 
   private ModelHandle    _modelHandle;
   private MaterialHandle[] _matHandles; // one per mesh group, all default on start
-
+  
+  private Mesh[]     _meshCache; // GPU handles, stable
+  private Material[] _matCache;  // value copies, cheap
+  
   override void onStart() {
     _modelHandle = ModelManager.instance.acquire(modelPath);
     auto asset   = ModelManager.instance.get(_modelHandle);
     _matHandles.length = asset.meshGroups.length;
     foreach (ref h; _matHandles)
       h = MaterialManager.instance.defaultMaterial();
+    buildCache();
   }
 
   override void onDraw() {
     if (!_modelHandle) return;
-    auto modelAsset = ModelManager.instance.get(_modelHandle);
-    foreach (i, ref g; modelAsset.meshGroups) {
-      auto matAsset = MaterialManager.instance.get(_matHandles[i]);
-      Material mat  = matAsset.raylibMaterial;
-      DrawMesh(g.mesh, mat, owner.transform.worldMatrix());
-    }
+    foreach (i, ref mesh; _meshCache)
+      DrawMesh(mesh, _matCache[i], owner.transform.worldMatrix());
   }
 
   override void onDestroy() {
+    import std.stdio;
+    writeln("destroy");
     foreach (ref h; _matHandles)
       MaterialManager.instance.release(h);
     _matHandles = null;
@@ -51,6 +58,20 @@ class ModelRenderer : Component {
     }
   }
 
+  void reloadMaterials() {
+    foreach (i, ref h; _matHandles)
+      _matCache[i] = MaterialManager.instance.get(h).raylibMaterial;
+  }
+  
+  private void buildCache() {
+    auto modelAsset  = ModelManager.instance.get(_modelHandle);
+    _meshCache.length = modelAsset.meshGroups.length;
+    _matCache.length  = modelAsset.meshGroups.length;
+    foreach (i, ref g; modelAsset.meshGroups)
+      _meshCache[i] = g.mesh;
+    reloadMaterials();
+  }
+  
   version(Editor) {
     import editor.inspector.drawer;
     override void onEditorStart()   { onStart(); }
@@ -61,6 +82,15 @@ class ModelRenderer : Component {
       float endY = 0.0f;
       if (drawFields(self, fieldStates, offsetX, offsetY, panelW, &endY))
         reload();
+
+      Rectangle btn = Rectangle(offsetX + 8, endY, panelW - 16, 20);
+      if (GuiButton(btn, "Load Materials from Model".toStringz())) {
+        import std.stdio;
+        writeln("reload");
+      }
+
+      endY += 28;
+      
       return endY;
     }
   }

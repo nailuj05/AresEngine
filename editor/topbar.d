@@ -43,6 +43,9 @@ immutable MenuDef[] MENUS = [
     MenuItem("Add Camera"),
     // MenuItem("Scene Settings"),
   ]),
+  MenuDef("Create", [
+    MenuItem("New Material"),
+  ]),
 ];
 
 // State

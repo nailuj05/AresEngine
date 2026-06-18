@@ -1,5 +1,6 @@
 import std.file;
 import std.getopt;
+import std.path : dirName;
 
 import raylib;
 import raygui;
@@ -11,6 +12,8 @@ import engine.core.component;
 import engine.core.gameobject;
 import engine.scene.scene;
 import engine.scene.loader;
+import engine.models.modelmanager;
+import engine.materials.materialmanager;
 import engine.scripting.luaruntime;
 import engine.rendering.camera : Camera;
 import engine.physics.world;
@@ -31,7 +34,7 @@ void log(T...)(T args) {
 int main(string[] args) {
   bool help;
   bool physProfile;
-  string scenePath;
+  string scenePath, projectPath;
   getopt(args,
          "help|h",    &help,
          "scene|s",   &scenePath,
@@ -61,6 +64,8 @@ int main(string[] args) {
     }
   }
 
+  projectPath = dirName(manifestPath);
+
   SetTraceLogLevel(TraceLogLevel.LOG_WARNING);
   SetConfigFlags(ConfigFlags.FLAG_MSAA_4X_HINT);
   initWindow(manifest);
@@ -74,6 +79,11 @@ int main(string[] args) {
 
   activeScene.physicsWorld = new PhysicsWorld();
   setActiveScene(activeScene);
+
+  // TODO: proper loading of assets once I figure out how to do the bundleing etc.
+  MaterialManager.init(projectPath);
+  ModelManager.init(projectPath);
+  
   activeScene.start();
   mainCamera = activeScene.getMainCamera();
   if (mainCamera is null) {
@@ -98,6 +108,9 @@ int main(string[] args) {
   // Destory, unload, end lua
   close_luaruntime();
   activeScene.destroy();
+
+  ModelManager.instance.shutdown();
+  MaterialManager.instance.shutdown();
 
   return 0;
 }

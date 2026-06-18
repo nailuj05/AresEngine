@@ -83,6 +83,10 @@ private bool drawVec3Row(string label, ref float x, ref float y, ref float z, re
   return changed;
 }
 
+bool drawVec3Field(string label, ref float x, ref float y, ref float z, ref FieldState[3] fs, float ox, float oy, float pw) {
+  return drawVec3Row(label, x, y, z, fs, ox, oy, pw);
+}
+
 bool drawVec3Field(string label, ref Vector3 v, ref FieldState[3] fs, float ox, float oy, float pw) {
   return drawVec3Row(label, v.x, v.y, v.z, fs, ox, oy, pw);
 }

@@ -23,6 +23,11 @@ enum float LABEL_W    = 120;
 enum float FIELD_H    = 20;
 enum float ROW_H      = 28;
 
+
+// ------------------------------------------------------------------------- //
+// TODO: This needs to be majorly refactored to be more readable and useable //
+// ------------------------------------------------------------------------- //
+
 struct FieldState {
   char[MAX_FIELD_BUFFER] buffer = 0;
   bool editing;

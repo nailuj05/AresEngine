@@ -1,0 +1,35 @@
+#version 330 core
+
+@uniform(engine) mat4 mvp;
+@uniform(engine) mat4 matModel;
+@uniform(engine) mat4 matNormal;
+@uniform(engine) vec4 colDiffuse;
+@uniform(engine) vec3 viewPos;
+
+@uniform(material, label="Color", min=0.0, max=1.0) vec4 color;
+
+@varying vec3 fragPos;
+@varying vec3 fragNormal;
+@varying vec2 fragTexCoord;
+
+@vertex
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 1) in vec2 vertexTexCoord;
+layout(location = 2) in vec3 vertexNormal;
+
+void main() {
+    fragPos      = vec3(matModel * vec4(vertexPosition, 1.0));
+    fragNormal   = normalize(mat3(matNormal) * vertexNormal);
+    fragTexCoord = vertexTexCoord;
+    gl_Position  = mvp * vec4(vertexPosition, 1.0);
+}
+
+@fragment
+out vec4 finalColor;
+
+uniform sampler2D texture0;
+
+void main() {
+    vec4 texColor = texture(texture0, fragTexCoord);
+    finalColor    = texColor * colDiffuse * color;
+}

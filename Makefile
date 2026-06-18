@@ -23,7 +23,7 @@ LUA_OBJS         = $(patsubst $(LUA_SRC_DIR)/%.c, $(LUA_OBJ_DIR)/%.o,         $(
 LUA_OBJS_RELEASE = $(patsubst $(LUA_SRC_DIR)/%.c, $(LUA_OBJ_DIR)/%.release.o, $(LUA_C_SRC))
 
 # general flags
-DFLAGS         = -I=vendor -I=engine -J=assets
+DFLAGS         = -I=vendor -I=engine -J=assets -J=engine/shaders
 DFLAGS_RELEASE = -I=vendor -I=engine -J=assets -O3 -release
 CFLAGS_EXTRA   =
 

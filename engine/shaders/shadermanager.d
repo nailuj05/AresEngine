@@ -14,7 +14,8 @@ private immutable string DefaultShaderSource = import("default.ashader");;
 struct ShaderAsset {
   string          sourcePath;
   Shader          raylibShader;
-  ShaderUniform[] uniforms;   // engine + material
+  ShaderUniform[] uniforms;
+  MatrixUniform[] matrices;
   int             refCount;
 }
 
@@ -50,7 +51,8 @@ public:
 
   ShaderHandle acquire(string path) {
     if (auto id = path in _pathIndex) {
-      _assets[*id].refCount++;
+      if (!_assets[*id].sourcePath.startsWith("builtin://"))
+        _assets[*id].refCount++;
       return ShaderHandle(*id);
     }
     return compileFile(path);
@@ -59,14 +61,13 @@ public:
   ShaderHandle defaultShader() {
     auto id = DefaultShaderKey in _pathIndex;
     assert(id, "Default shader not registered");
-    _assets[*id].refCount++;
     return ShaderHandle(*id);
   }
 
   void release(ShaderHandle h) {
     auto asset = h.id in _assets;
     if (!asset) return;
-    if (asset.sourcePath.startsWith("builtin://")) { asset.refCount--; return; }
+    if (asset.sourcePath.startsWith("builtin://")) return;  // pinned, never touched
     if (--asset.refCount == 0) unload(h.id);
   }
 
@@ -75,8 +76,13 @@ public:
   }
 
   void shutdown() {
-    foreach (id, ref asset; _assets)
-      UnloadShader(asset.raylibShader);
+    foreach (id, ref asset; _assets) {
+      int expected = asset.sourcePath.startsWith("builtin://") ? 1 : 0;
+      if (asset.refCount > expected)
+        assert(false, format!"Shader (%s) refCount not zero (%s) (component leak)"(asset.sourcePath, asset.refCount));
+
+      unload(id);
+    }
     _assets    = null;
     _pathIndex = null;
     _instance  = null;
@@ -103,16 +109,19 @@ private:
   }
 
   ShaderHandle register(string key, ParsedShader parsed) {
-    Shader sh = LoadShaderFromMemory(
-                                     parsed.vertSource.toStringz,
-                                     parsed.fragSource.toStringz);
+    Shader sh = LoadShaderFromMemory(parsed.vertSource.toStringz, parsed.fragSource.toStringz);
+    assert(sh.id != 0, "Shader compilation failed, got default fallback");
+
     foreach (ref u; parsed.uniforms)
       u.loc = GetShaderLocation(sh, u.name.toStringz);
+    foreach (ref m; parsed.matrices)
+      m.loc = GetShaderLocation(sh, m.name.toStringz);
 
     ShaderAsset asset;
     asset.sourcePath   = key;
     asset.raylibShader = sh;
     asset.uniforms     = parsed.uniforms;
+    asset.matrices     = parsed.matrices;
     asset.refCount     = 1;
 
     uint id         = _nextId++;

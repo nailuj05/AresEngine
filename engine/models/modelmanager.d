@@ -6,6 +6,7 @@ import std.algorithm : startsWith;
 import raylib;
 
 import engine.models.model;
+import engine.materials.materialmanager : MAX_MATERIAL_MAPS;
 
 class ModelManager {
 private:
@@ -42,10 +43,10 @@ public:
     foreach (id, ref asset; _assets) {
       // primitives carry one manager-owned ref, components should have released theirs
       int expectedRef = asset.sourcePath.startsWith("primitive://") ? 1 : 0;
-      if (asset.refCount > expectedRef)
-        assert(false, format!"Model (%s) Ref Count not zero (component leaks)"(asset.sourcePath));
-      foreach (ref g; asset.meshGroups) UnloadMesh(g.mesh);
-      foreach (ref m; asset.materials)  UnloadMaterial(m);
+      if (asset.refCount > expectedRef) {
+        version(Editor) {} else { assert(false, format!"Model (%s) Ref Count not zero (component leaks)"(asset.sourcePath)); }
+      }
+      unload(id);
     }
     _assets    = null;
     _pathIndex = null;
@@ -53,8 +54,10 @@ public:
   }
 
   ModelHandle acquire(string path) {
+    import std.stdio;
     if (auto id = path in _pathIndex) {
-      _assets[*id].refCount++;
+      if (!_assets[*id].sourcePath.startsWith("primitive://"))
+        _assets[*id].refCount++;
       return ModelHandle(*id);
     }
     return importFile(path);
@@ -62,11 +65,9 @@ public:
 
   void release(ModelHandle h) {
     auto asset = h.id in _assets;
+    import std.stdio;
     if (!asset) return;
-    if (asset.sourcePath.startsWith("primitive://")) {
-      asset.refCount--;
-      return;
-    }
+    if (asset.sourcePath.startsWith("primitive://")) return;
     if (--asset.refCount == 0) unload(h.id);
   }
 
@@ -87,7 +88,6 @@ private:
     asset.sourcePath    = key;
     asset.refCount      = 1; // manager-owned ref, never released
     asset.meshGroups    = [MeshGroup(mesh, 0)];
-    asset.materials     = [LoadMaterialDefault()];
     uint id             = _nextId++;
     _assets[id]         = asset;
     _pathIndex[key]     = id;
@@ -112,10 +112,6 @@ private:
     foreach (i; 0 .. tmp.meshCount)
       asset.meshGroups[i] = MeshGroup(tmp.meshes[i], tmp.meshMaterial[i]);
 
-    asset.materials.length = tmp.materialCount;
-    foreach (i; 0 .. tmp.materialCount)
-      asset.materials[i] = tmp.materials[i];
-
     uint id          = _nextId++;
     _assets[id]      = asset;
     _pathIndex[path] = id;
@@ -125,7 +121,6 @@ private:
   void unload(uint id) {
     auto asset = id in _assets;
     foreach (ref g; asset.meshGroups) UnloadMesh(g.mesh);
-    foreach (ref m; asset.materials)  UnloadMaterial(m);
     _pathIndex.remove(asset.sourcePath);
     _assets.remove(id);
   }
@@ -158,15 +153,6 @@ private:
                              asset.sourcePath,
                              cast(int) asset.meshGroups.length);
       return result;
-    }
-
-    public void unloadAll() {
-      foreach (id, ref asset; _assets) {
-        foreach (ref g; asset.meshGroups) UnloadMesh(g.mesh);
-        foreach (ref m; asset.materials)  UnloadMaterial(m);
-      }
-      _assets.clear();
-      _pathIndex.clear();
     }
   }
 }

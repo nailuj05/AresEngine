@@ -10,7 +10,6 @@ struct MeshGroup {
 struct ModelAsset {
   string       sourcePath;
   MeshGroup[]  meshGroups;
-  Material[]   materials;
   int          refCount;
 }
 

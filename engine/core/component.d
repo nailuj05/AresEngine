@@ -8,6 +8,7 @@ import engine.core.gameobject;
 import engine.rendering.modelrenderer: ModelRenderer;
 import engine.scripting.luascript : LuaScript;
 import engine.rendering.camera : Camera;
+import engine.rendering.drawcontext: DrawContext;
 import engine.oscillator : Oscillator;
 import engine.physics.rigidbody : Rigidbody;
 import engine.physics.boxcollider : BoxCollider;
@@ -32,12 +33,12 @@ abstract class Component {
   bool enabled = true;
   @property string name() const;
 
-  void onEditorStart()    {}
-  void onStart()          {}
-  void onUpdate(float dt) {}
-  void onDraw()           {}
-  void onDestroy()        {}
-  void onEditorDestroy()  {}
+  void onEditorStart()         {}
+  void onStart()               {}
+  void onUpdate(float dt)      {}
+  void onDraw(DrawContext ctx) {}
+  void onDestroy()             {}
+  void onEditorDestroy()       {}
 
   version(Editor) {
     abstract float drawInspector(float offsetX, float offsetY, float panelW);

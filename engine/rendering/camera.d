@@ -3,6 +3,7 @@ module engine.rendering.camera;
 import raylib;
 
 import engine.core.component;
+import engine.rendering.drawcontext;
 
 class Camera : Component {
   mixin Named!"Camera";
@@ -29,7 +30,7 @@ class Camera : Component {
     rcamera.target     = owner.transform.position + owner.transform.forward;
   }
 
-  override void onDraw() {
+  override void onDraw(DrawContext ctx) {
     version(Editor) {
       Color colorSolid = Color(50, 50, 50);
       Color colorWire  = Color(10, 10, 10);

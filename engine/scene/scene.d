@@ -5,6 +5,7 @@ import std.algorithm.mutation : remove;
 import engine.core.transform;
 import engine.core.gameobject;
 import engine.rendering.camera;
+import engine.rendering.drawcontext;
 import engine.physics.world;
 
 private Scene _activeScene;
@@ -48,9 +49,9 @@ class Scene {
       if (t.gameObject.active) t.gameObject.update(dt);
   }
 
-  void draw() {
+  void draw(DrawContext ctx) {
     foreach (t; roots)
-      if (t.gameObject.active) t.gameObject.draw();
+      if (t.gameObject.active) t.gameObject.draw(ctx);
   }
 
   void destroy() {

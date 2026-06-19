@@ -4,6 +4,7 @@ import raylib : Vector3, Quaternion;
 
 import engine.core.transform;
 import engine.core.component;
+import engine.rendering.drawcontext;
 
 class GameObject {
   string       name;
@@ -73,12 +74,12 @@ class GameObject {
       if (c.enabled) c.onUpdate(dt);
   }
 
-  void draw() {
+  void draw(DrawContext ctx) {
     foreach (c; components)
-      if (c.enabled) c.onDraw();
+      if (c.enabled) c.onDraw(ctx);
 
     foreach (c; transform.children)
-      if (c.gameObject.active) c.gameObject.draw();
+      if (c.gameObject.active) c.gameObject.draw(ctx);
   }
 
   void destroy() {

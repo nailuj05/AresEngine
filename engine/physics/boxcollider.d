@@ -5,6 +5,7 @@ import raylib;
 import raylib.raymath;
  
 import engine.core.component;
+import engine.rendering.drawcontext;
 import engine.physics.aabb      : AABB;
 import engine.physics.collider  : Collider;
 import engine.physics.narrowphase : OBB;
@@ -56,7 +57,7 @@ class BoxCollider : Collider {
                 Vector3Add     (b.center, ext));
   }
 
-  override void onDraw() {
+  override void onDraw(DrawContext ctx) {
     rlPushMatrix();
     auto m = MatrixToFloat(owner.transform.worldMatrix());
     rlMultMatrixf(m.ptr);

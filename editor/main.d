@@ -17,9 +17,11 @@ import engine.scene.scene;
 import engine.scene.loader;
 import engine.rendering.camera : Camera;
 import engine.rendering.modelrenderer;
+import engine.rendering.drawcontext;
 import engine.scripting.luaruntime;
 import engine.models.modelmanager;
 import engine.materials.materialmanager;
+import engine.shaders.shadermanager;
 import engine.oscillator;
 
 import editor.style;
@@ -162,12 +164,20 @@ int main(string[] args) {
 
   setActiveScene(activeScene);
 
-  // modelmanager needs to be initialized before scene start
+  // managers needs to be initialized before scene start
+  ShaderManager.init(projectPath);
+  
   MaterialManager.init(projectPath);
   
   ModelManager.init(projectPath);
   ModelManager.instance.loadAllAssets(); // a bit ugly, but fine for this engine
-  
+  // unload in reverse order
+  scope(exit) {
+    ModelManager.instance.shutdown();
+    MaterialManager.instance.shutdown();
+    ShaderManager.instance.shutdown();
+  }
+   
   activeScene.editorStart();
   log("Editor Start");
 
@@ -188,7 +198,7 @@ int main(string[] args) {
     if (selected !is null)
       updateGizmo(gizmo, viewport, editorCam.cam, selected);
 
-    renderScene(activeScene);
+    renderScene(activeScene, editorCam);
 
     BeginDrawing();
     ClearBackground(Colors.BLACK);
@@ -238,24 +248,25 @@ int main(string[] args) {
   // TODO: Proper "close without saving?" dialog
   saveScene(activeScene, activeScene.name ~ ".json");
   
+  log("Editor Destroy");
   activeScene.editorDestroy();
 
-  ModelManager.instance.unloadAll();
-  ModelManager.instance.shutdown();
-
-  MaterialManager.instance.shutdown();
+  materialDialog.close();
 
   saveManifest();
 
   return 0;
 }
 
-void renderScene(Scene scene) {
+void renderScene(Scene scene, EditorCamera cam) {
+  DrawContext ctx = { cam.cam };
+
   BeginTextureMode(sceneTarget);
   ClearBackground(Color(60, 60, 60, 255));
   BeginMode3D(editorCam.cam);
+
   DrawGrid(20, 1.0f);
-  scene.draw();
+  scene.draw(ctx);
   if (selected !is null) {
     drawGizmo(gizmo, selected.transform.position, selected.transform.rotation, editorCam.cam);
   }

@@ -1,20 +1,23 @@
 module engine.materials.material;
+
 import raylib;
 
-enum UniformType { Float, Vec2, Vec3, Vec4, Int }
+import engine.shaders.shadermanager : ShaderHandle;
+import engine.shaders.ashader       : ShaderUniform;
 
-struct ShaderUniform {
-  string      name;
-  int         loc  = -1;  // cached via GetShaderLocation at load time
-  UniformType type;
-  float[4]    data;       // all scalar/vector types fit; cast at upload
+struct EngineUniformLocs {
+  int matModel  = -1;
+  int matNormal = -1;
+  int viewPos   = -1;
 }
 
 struct MaterialAsset {
-  string          sourcePath;
-  Material        raylibMaterial;  // holds shader + map slots
-  ShaderUniform[] uniforms;
-  int             refCount;
+  string            sourcePath;
+  ShaderHandle      shaderHandle;
+  Material          raylibMaterial;
+  ShaderUniform[]   uniforms;     // @material only, with current values
+  EngineUniformLocs engineLocs;
+  int               refCount;
 }
 
 struct MaterialHandle {

@@ -16,6 +16,7 @@ import engine.models.modelmanager;
 import engine.materials.materialmanager;
 import engine.scripting.luaruntime;
 import engine.rendering.camera : Camera;
+import engine.rendering.drawcontext;
 import engine.physics.world;
 
 static immutable ubyte[] ICON_DATA  = cast(immutable ubyte[]) import("logo/logo-icon.png");
@@ -97,7 +98,8 @@ int main(string[] args) {
     ClearBackground(Colors.BLACK);
     BeginMode3D(mainCamera.rcamera);
     DrawGrid(20, 1.0f);
-    activeScene.draw();
+    DrawContext ctx = { mainCamera.rcamera };
+    activeScene.draw(ctx);
     EndMode3D();
     DrawFPS(10, 10);
     if (physProfile)

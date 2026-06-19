@@ -216,7 +216,8 @@ string drawProject(Rectangle panel) {
     // interaction
     if (hovered && IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT)) {
       double now = GetTime();
-      if (lastClickIdx == cast(int)i && now - lastClickTime < 0.35) { // double click
+      // TODO: Figure out why this needs to be so large on laptop/touchpad
+      if (lastClickIdx == cast(int)i && now - lastClickTime < 2.5) { // double click
         if (e.isDir)
           navigateTo(e.name);  // enter folder
         else

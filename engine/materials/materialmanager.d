@@ -4,11 +4,14 @@ import std.string;
 import std.algorithm : startsWith;
 import std.json;
 import std.file  : readText, write;
-import std.conv;
 
 import raylib;
 
 import engine.materials.material;
+import engine.shaders.shadermanager;
+import engine.shaders.ashader;
+
+enum MAX_MATERIAL_MAPS = 12;
 
 class MaterialManager {
 private:
@@ -29,7 +32,7 @@ public:
 
   static void init(string projectRoot) {
     assert(!_instance, "MaterialManager already initialized");
-    _instance = new MaterialManager();
+    _instance              = new MaterialManager();
     _instance._projectRoot = projectRoot;
     _instance.registerDefault();
   }
@@ -37,10 +40,11 @@ public:
   void shutdown() {
     if (!_instance) return;
     foreach (id, ref asset; _assets) {
-      int expectedRef = asset.sourcePath.startsWith("builtin://") ? 1 : 0;
-      if (asset.refCount > expectedRef)
-        assert(false, "Material (" ~ asset.sourcePath ~ ") refCount not " ~ to!string(expectedRef) ~ " (component leak)");
-      UnloadMaterial(asset.raylibMaterial);
+      int expected = asset.sourcePath.startsWith("builtin://") ? 1 : 0;
+      if (asset.refCount > expected)
+        assert(false, format!"Material (%s) refCount not zero (%s) (component leak)"(asset.sourcePath, asset.refCount));
+
+      unload(id);
     }
     _assets    = null;
     _pathIndex = null;
@@ -49,7 +53,8 @@ public:
 
   MaterialHandle acquire(string path) {
     if (auto id = path in _pathIndex) {
-      _assets[*id].refCount++;
+      if (!_assets[*id].sourcePath.startsWith("builtin://"))
+        _assets[*id].refCount++;
       return MaterialHandle(*id);
     }
     return importFile(path);
@@ -58,17 +63,13 @@ public:
   MaterialHandle defaultMaterial() {
     auto id = DefaultMaterialKey in _pathIndex;
     assert(id, "Default material not registered");
-    _assets[*id].refCount++;
     return MaterialHandle(*id);
   }
 
   void release(MaterialHandle h) {
     auto asset = h.id in _assets;
     if (!asset) return;
-    if (asset.sourcePath.startsWith("builtin://")) {
-      asset.refCount--; // decrement but never unload
-      return;
-    }
+    if (asset.sourcePath.startsWith("builtin://")) return;
     if (--asset.refCount == 0) unload(h.id);
   }
 
@@ -76,66 +77,116 @@ public:
     return h.id in _assets;
   }
 
-  // Saves a material asset to disk as JSON.
   void save(MaterialHandle h, string path) {
     import std.path : buildPath, isAbsolute;
     auto asset   = h.id in _assets;
+    assert(asset);
+    auto shAsset = ShaderManager.instance.get(asset.shaderHandle);
+
+    JSONValue[] uniformsJ;
+    foreach (ref u; asset.uniforms)
+      uniformsJ ~= JSONValue(["name":  JSONValue(u.name),
+                              "value": JSONValue([u.data[0], u.data[1], u.data[2], u.data[3]]),
+                              ]);
+
+    JSONValue j = JSONValue(["shader":   JSONValue(shAsset ? shAsset.sourcePath : ""),
+                             "uniforms": JSONValue(uniformsJ),
+                             ]);
     string absPath = isAbsolute(path) ? path : buildPath(_projectRoot, path);
-    JSONValue j  = JSONValue(["diffuse": serializeColor(asset.raylibMaterial.maps[MATERIAL_MAP_DIFFUSE].color)]);
     write(absPath, j.toPrettyString());
   }
 
 private:
   void registerDefault() {
-    Material mat  = LoadMaterialDefault();
-    mat.maps[MATERIAL_MAP_DIFFUSE].color = Colors.WHITE;
-
-    MaterialAsset asset;
-    asset.sourcePath      = DefaultMaterialKey;
-    asset.raylibMaterial  = mat;
-    asset.refCount        = 1; // manager-owned, never released
-
-    uint id = _nextId++;
-    _assets[id]                   = asset;
-    _pathIndex[DefaultMaterialKey] = id;
+    ShaderHandle sh = ShaderManager.instance.defaultShader();
+    auto handle     = buildAsset(DefaultMaterialKey, sh, null);
+    // white default color
+    auto id    = DefaultMaterialKey in _pathIndex;
+    auto asset = &_assets[*id];
+    foreach (ref u; asset.uniforms)
+      if (u.name == "color") { u.data = [1.0f, 1.0f, 1.0f, 1.0f]; break; }
   }
 
   MaterialHandle importFile(string path) {
     import std.path : buildPath, isAbsolute;
     string absPath = isAbsolute(path) ? path : buildPath(_projectRoot, path);
+    JSONValue j    = parseJSON(readText(absPath));
 
-    JSONValue j = parseJSON(readText(absPath));
+    string shaderPath = "shader" in j ? j["shader"].str : "";
+    ShaderHandle sh   = shaderPath.length > 0
+      ? ShaderManager.instance.acquire(shaderPath)
+      : ShaderManager.instance.defaultShader();
 
-    Material mat = LoadMaterialDefault();
-    mat.maps[MATERIAL_MAP_DIFFUSE].color = toColor(j["diffuse"]);
+    float[4][string] savedValues;
+    if (auto uArr = "uniforms" in j)
+      foreach (ref uJ; uArr.array) {
+        auto arr = uJ["value"].array;
+        savedValues[uJ["name"].str] = [cast(float)arr[0].floating, cast(float)arr[1].floating,
+                                       cast(float)arr[2].floating, cast(float)arr[3].floating,
+                                       ];
+      }
+
+    return buildAsset(path, sh, &savedValues);
+  }
+
+  MaterialHandle buildAsset(string key, ShaderHandle sh, float[4][string]* savedValues) {
+    auto shAsset = ShaderManager.instance.get(sh);
+    assert(shAsset);
+
+    ShaderUniform[] matUniforms;
+    EngineUniformLocs engineLocs;
+
+    foreach (ref u; shAsset.uniforms) {
+      if (u.owner == UniformOwner.Material) {
+        ShaderUniform copy = u;
+        if (savedValues)
+          if (auto v = u.name in *savedValues)
+            copy.data = *v;
+        matUniforms ~= copy;
+      } else {
+        switch (u.name) {
+        case "viewPos":   engineLocs.viewPos   = u.loc; break;
+        default: break;
+        }
+      }
+    }
+
+    foreach (ref m; shAsset.matrices) {
+      switch (m.name) {
+      case "matModel":  engineLocs.matModel  = m.loc; break;
+      case "matNormal": engineLocs.matNormal = m.loc; break;
+      default: break;
+      }
+    }
+
+    import raylib : MemAlloc;
+    Material mat;
+    mat.shader = shAsset.raylibShader;
+    mat.maps   = cast(MaterialMap*) MemAlloc((MaterialMapIndex.MATERIAL_MAP_CUBEMAP + 1) * MaterialMap.sizeof);
 
     MaterialAsset asset;
-    asset.sourcePath     = path;
+    asset.sourcePath     = key;
+    asset.shaderHandle   = sh;
     asset.raylibMaterial = mat;
+    asset.uniforms       = matUniforms;
+    asset.engineLocs     = engineLocs;
     asset.refCount       = 1;
 
     uint id          = _nextId++;
     _assets[id]      = asset;
-    _pathIndex[path] = id;
+    _pathIndex[key]  = id;
     return MaterialHandle(id);
   }
 
   void unload(uint id) {
     auto asset = id in _assets;
-    UnloadMaterial(asset.raylibMaterial);
+    // Same manual free as above
+    foreach (ref map; asset.raylibMaterial.maps[0 .. MAX_MATERIAL_MAPS])
+      if (map.texture.id != 0) UnloadTexture(map.texture);
+    MemFree(asset.raylibMaterial.maps);
+    ShaderManager.instance.release(asset.shaderHandle);
     _pathIndex.remove(asset.sourcePath);
     _assets.remove(id);
-  }
-
-  // Color helpers -- move to a shared util if loader.d exposes them
-  static JSONValue serializeColor(Color c) {
-    return JSONValue(["r": JSONValue(c.r), "g": JSONValue(c.g),
-                      "b": JSONValue(c.b), "a": JSONValue(c.a)]);
-  }
-
-  static Color toColor(JSONValue j) {
-    return Color(cast(ubyte)j["r"].integer, cast(ubyte)j["g"].integer,
-                 cast(ubyte)j["b"].integer, cast(ubyte)j["a"].integer);
   }
 
   version(Editor) {
@@ -144,12 +195,11 @@ private:
       import std.path : extension, relativePath;
       foreach (entry; dirEntries(_projectRoot, SpanMode.depth)) {
         if (!entry.isFile) continue;
-        foreach (ext; MaterialExtensions) {
+        foreach (ext; MaterialExtensions)
           if (entry.name.extension == ext) {
             acquire(relativePath(entry.name, _projectRoot));
             break;
           }
-        }
       }
     }
 
@@ -167,8 +217,13 @@ private:
     }
 
     public void unloadAll() {
-      foreach (id, ref asset; _assets)
-        UnloadMaterial(asset.raylibMaterial);
+      foreach (id, ref asset; _assets) {
+        // Same manual free as above
+        foreach (ref map; asset.raylibMaterial.maps[0 .. MAX_MATERIAL_MAPS])
+          if (map.texture.id != 0) UnloadTexture(map.texture);
+        MemFree(asset.raylibMaterial.maps);
+        ShaderManager.instance.release(asset.shaderHandle);
+      }
       _assets.clear();
       _pathIndex.clear();
     }

@@ -136,34 +136,46 @@ private:
     ShaderUniform[] matUniforms;
     EngineUniformLocs engineLocs;
 
+    Material mat;
+    mat.shader = shAsset.raylibShader;
+    mat.maps   = cast(MaterialMap*) MemAlloc((MaterialMapIndex.MATERIAL_MAP_CUBEMAP + 1) * MaterialMap.sizeof);
+    // default albedo white so colDiffuse * color != black
+    mat.maps[MaterialMapIndex.MATERIAL_MAP_ALBEDO].color = Colors.WHITE;
+
     foreach (ref u; shAsset.uniforms) {
+      switch (u.name) {
+      case "colDiffuse": mat.shader.locs[ShaderLocationIndex.SHADER_LOC_COLOR_DIFFUSE] = u.loc; break;
+      case "viewPos":
+        mat.shader.locs[ShaderLocationIndex.SHADER_LOC_VECTOR_VIEW] = u.loc;
+        engineLocs.viewPos = u.loc;
+        break;
+      default: break;
+      }
       if (u.owner == UniformOwner.Material) {
         ShaderUniform copy = u;
         if (savedValues)
           if (auto v = u.name in *savedValues)
             copy.data = *v;
         matUniforms ~= copy;
-      } else {
-        switch (u.name) {
-        case "viewPos":   engineLocs.viewPos   = u.loc; break;
-        default: break;
-        }
       }
     }
 
     foreach (ref m; shAsset.matrices) {
       switch (m.name) {
-      case "matModel":  engineLocs.matModel  = m.loc; break;
-      case "matNormal": engineLocs.matNormal = m.loc; break;
+      case "mvp":       mat.shader.locs[ShaderLocationIndex.SHADER_LOC_MATRIX_MVP]    = m.loc; break;
+      case "matModel":
+        mat.shader.locs[ShaderLocationIndex.SHADER_LOC_MATRIX_MODEL]  = m.loc;
+        engineLocs.matModel = m.loc;
+        break;
+      case "matNormal":
+        mat.shader.locs[ShaderLocationIndex.SHADER_LOC_MATRIX_NORMAL] = m.loc;
+        engineLocs.matNormal = m.loc;
+        break;
       default: break;
       }
     }
 
-    import raylib : MemAlloc;
-    Material mat;
-    mat.shader = shAsset.raylibShader;
-    mat.maps   = cast(MaterialMap*) MemAlloc((MaterialMapIndex.MATERIAL_MAP_CUBEMAP + 1) * MaterialMap.sizeof);
-
+    // rest unchanged
     MaterialAsset asset;
     asset.sourcePath     = key;
     asset.shaderHandle   = sh;
@@ -172,9 +184,9 @@ private:
     asset.engineLocs     = engineLocs;
     asset.refCount       = 1;
 
-    uint id          = _nextId++;
-    _assets[id]      = asset;
-    _pathIndex[key]  = id;
+    uint id         = _nextId++;
+    _assets[id]     = asset;
+    _pathIndex[key] = id;
     return MaterialHandle(id);
   }
 

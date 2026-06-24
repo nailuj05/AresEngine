@@ -94,7 +94,7 @@ private:
     // onEditorStart acquires the model; we patch the material immediately after.
     // MaterialHandle is already held by this dialog; pass a second acquire so
     // ModelRenderer.onDestroy can release its own copy independently.
-    renderer.setMaterialOverride(0, path);
+    // renderer.setMaterialOverride(0, path);
   }
 
   // -------------------------------------------------------------------------

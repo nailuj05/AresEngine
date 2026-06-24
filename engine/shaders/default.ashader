@@ -27,10 +27,6 @@ void main() {
 @fragment
 out vec4 finalColor;
 
-// handled via raylib directly
-uniform sampler2D texture0;
-
 void main() {
-    vec4 texColor = texture(texture0, fragTexCoord);
-    finalColor    = texColor * colDiffuse * color;
+    finalColor = colDiffuse * color;
 }

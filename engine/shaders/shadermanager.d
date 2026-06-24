@@ -90,7 +90,13 @@ public:
 
 private:
   void registerDefault() {
-    register(DefaultShaderKey, parseAShader(DefaultShaderSource));
+    auto parsed = parseAShader(DefaultShaderSource);
+    // dump builtin to cache for inspection
+    import std.path : buildPath;
+    import std.file : write;
+    write(buildPath(_cacheDir, "builtin_default.vert"), parsed.vertSource);
+    write(buildPath(_cacheDir, "builtin_default.frag"), parsed.fragSource);
+    register(DefaultShaderKey, parsed);
   }
 
   ShaderHandle compileFile(string path) {

@@ -24,8 +24,8 @@ import editor.editorcamera;
 import editor.style;
 import editor.inspector.drawer;
 
-private enum WIN_W   = 820.0f;
-private enum WIN_H   = 560.0f;
+private enum WIN_W   = 900.0f;
+private enum WIN_H   = 600.0f;
 private enum HEADER  = 24;
 private enum PAD     =  8;
 private enum BTN_H   = 28;
@@ -44,7 +44,7 @@ private:
   MaterialHandle     matHandle;
   string             path;
 
-  // Preview scene objects -- one per primitive, swapped by setting modelPath.
+  // Preview scene objects
   GameObject         previewObject;
   ModelRenderer      renderer;
 
@@ -65,7 +65,6 @@ private:
 
   static bool s_open;
 
-  // -------------------------------------------------------------------------
   void openRT(int w, int h) {
     if (rtReady) UnloadRenderTexture(previewRT);
     previewRT = LoadRenderTexture(w, h);
@@ -93,7 +92,6 @@ private:
     renderer.setMaterialOverride(0, path);
   }
 
-  // -------------------------------------------------------------------------
   void drawPreview(Rectangle area) {
     int pw = cast(int)(area.width  - PAD * 2);
     int ph = cast(int)(area.height - PAD * 2);
@@ -128,13 +126,10 @@ private:
     if (primitive != prev) resetPreviewObject();
   }
 
-  // -------------------------------------------------------------------------
   void drawUniforms(Rectangle area) {
     auto asset = MaterialManager.instance.get(matHandle);
     if (!asset) {
-      DrawGuiText("Asset not loaded.".toStringz,
-                  cast(int)(area.x + PAD), cast(int)(area.y + PAD),
-                  TEXT_SZ, GetColor(0x888888FF));
+      DrawGuiText("Asset not loaded.".toStringz, cast(int)(area.x + PAD), cast(int)(area.y + PAD), TEXT_SZ, GetColor(0x888888FF));
       return;
     }
 
@@ -144,9 +139,7 @@ private:
 
     GuiLabel(Rectangle(x, y, LABEL_W, FIELD_H), "Path:");
     string relPath = relativePath(path, getCurrentProjectPath());
-    DrawGuiText(relPath.toStringz,
-                cast(int)(x + LABEL_W + 4), cast(int)y,
-                TEXT_SZ, GetColor(0xAAAAAFFF));
+    DrawGuiText(relPath.toStringz, cast(int)(x + LABEL_W + 4), cast(int)y, TEXT_SZ, GetColor(0xAAAAAFFF));
     y += ROW_H;
 
     GuiLine(Rectangle(x, y, pw, 1), null);
@@ -166,8 +159,7 @@ private:
     GuiScrollPanel(view, null, content, &scroll, &scissor);
     scroll.x = 0;
 
-    BeginScissorMode(cast(int)scissor.x, cast(int)scissor.y,
-                     cast(int)scissor.width, cast(int)scissor.height);
+    BeginScissorMode(cast(int)scissor.x, cast(int)scissor.y, cast(int)scissor.width, cast(int)scissor.height);
 
     float ry = y + scroll.y + PAD;
 
@@ -184,8 +176,7 @@ private:
         if (k !in fieldStates) fieldStates[k] = FieldState.init;
         changed = drawField(u.name, u.data[0], fieldStates[k], x, rowY, pw);
         if (changed)
-          SetShaderValue(asset.raylibMaterial.shader, u.loc,
-                         &u.data[0], ShaderUniformDataType.SHADER_UNIFORM_FLOAT);
+          SetShaderValue(asset.raylibMaterial.shader, u.loc, &u.data[0], ShaderUniformDataType.SHADER_UNIFORM_FLOAT);
         break;
       }
       case UniformType.Int: {
@@ -195,8 +186,7 @@ private:
         changed = drawField(u.name, iv, fieldStates[k], x, rowY, pw);
         if (changed) {
           u.data[0] = cast(float)iv;
-          SetShaderValue(asset.raylibMaterial.shader, u.loc,
-                         &iv, ShaderUniformDataType.SHADER_UNIFORM_INT);
+          SetShaderValue(asset.raylibMaterial.shader, u.loc, &iv, ShaderUniformDataType.SHADER_UNIFORM_INT);
         }
         break;
       }
@@ -208,8 +198,7 @@ private:
         changed = drawVec3Field(u.name, u.data[0], u.data[1], u.data[2], fs, x, rowY, pw);
         fieldStates[kx] = fs[0]; fieldStates[ky] = fs[1];
         if (changed)
-          SetShaderValue(asset.raylibMaterial.shader, u.loc,
-                         u.data.ptr, ShaderUniformDataType.SHADER_UNIFORM_VEC2);
+          SetShaderValue(asset.raylibMaterial.shader, u.loc, u.data.ptr, ShaderUniformDataType.SHADER_UNIFORM_VEC2);
         break;
       }
       case UniformType.Vec3: {
@@ -221,8 +210,7 @@ private:
         changed = drawVec3Field(u.name, u.data[0], u.data[1], u.data[2], fs, x, rowY, pw);
         fieldStates[kx] = fs[0]; fieldStates[ky] = fs[1]; fieldStates[kz] = fs[2];
         if (changed)
-          SetShaderValue(asset.raylibMaterial.shader, u.loc,
-                         u.data.ptr, ShaderUniformDataType.SHADER_UNIFORM_VEC3);
+          SetShaderValue(asset.raylibMaterial.shader, u.loc, u.data.ptr, ShaderUniformDataType.SHADER_UNIFORM_VEC3);
         break;
       }
       case UniformType.Vec4: {
@@ -230,12 +218,10 @@ private:
         string k = kbase ~ ".col";
         if (k !in fieldStates) fieldStates[k] = FieldState.init;
 
-        Color col = Color(
-                          cast(ubyte)(clamp(u.data[0], 0.0f, 1.0f) * 255.0f),
+        Color col = Color(cast(ubyte)(clamp(u.data[0], 0.0f, 1.0f) * 255.0f),
                           cast(ubyte)(clamp(u.data[1], 0.0f, 1.0f) * 255.0f),
                           cast(ubyte)(clamp(u.data[2], 0.0f, 1.0f) * 255.0f),
-                          cast(ubyte)(clamp(u.data[3], 0.0f, 1.0f) * 255.0f),
-                          );
+                          cast(ubyte)(clamp(u.data[3], 0.0f, 1.0f) * 255.0f),);
 
         changed = drawField(u.name, col, fieldStates[k], x, rowY, pw);
 
@@ -270,11 +256,7 @@ public:
     drag        = false;
     previewCam  = EditorCamera.create(Vector3(0, 2, 4));
 
-    b = Rectangle(
-                  GetScreenWidth()  / 2.0f - WIN_W / 2.0f,
-                  GetScreenHeight() / 2.0f - WIN_H / 2.0f,
-                  WIN_W, WIN_H
-                  );
+    b = Rectangle(GetScreenWidth()  / 2.0f - WIN_W / 2.0f, GetScreenHeight() / 2.0f - WIN_H / 2.0f, WIN_W, WIN_H);
 
     resetPreviewObject();
   }
@@ -288,7 +270,7 @@ public:
       renderer      = null;
     }
 
-    // save material
+    // save material then release
     MaterialManager.instance.save(matHandle, path);
 
     MaterialManager.instance.release(matHandle);

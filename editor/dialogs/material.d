@@ -226,21 +226,26 @@ private:
         break;
       }
       case UniformType.Vec4: {
-        string kx = kbase ~ ".x", ky = kbase ~ ".y",
-          kz = kbase ~ ".z", kw = kbase ~ ".w";
-        if (kx !in fieldStates) fieldStates[kx] = FieldState.init;
-        if (ky !in fieldStates) fieldStates[ky] = FieldState.init;
-        if (kz !in fieldStates) fieldStates[kz] = FieldState.init;
-        if (kw !in fieldStates) fieldStates[kw] = FieldState.init;
-        FieldState[3] fs = [fieldStates[kx], fieldStates[ky], fieldStates[kz]];
-        changed = drawVec3Field(u.name, u.data[0], u.data[1], u.data[2], fs, x, rowY, pw);
-        fieldStates[kx] = fs[0]; fieldStates[ky] = fs[1]; fieldStates[kz] = fs[2];
-        if (drawField("w", u.data[3], fieldStates[kw],
-                      x + LABEL_W, rowY + FIELD_H + 2, pw - LABEL_W))
-          changed = true;
-        if (changed)
-          SetShaderValue(asset.raylibMaterial.shader, u.loc,
-                         u.data.ptr, ShaderUniformDataType.SHADER_UNIFORM_VEC4);
+        // treat all vec4 uniforms as linear RGBA colors (0.0-1.0 -> 0-255)
+        string k = kbase ~ ".col";
+        if (k !in fieldStates) fieldStates[k] = FieldState.init;
+
+        Color col = Color(
+                          cast(ubyte)(clamp(u.data[0], 0.0f, 1.0f) * 255.0f),
+                          cast(ubyte)(clamp(u.data[1], 0.0f, 1.0f) * 255.0f),
+                          cast(ubyte)(clamp(u.data[2], 0.0f, 1.0f) * 255.0f),
+                          cast(ubyte)(clamp(u.data[3], 0.0f, 1.0f) * 255.0f),
+                          );
+
+        changed = drawField(u.name, col, fieldStates[k], x, rowY, pw);
+
+        if (changed) {
+          u.data[0] = col.r / 255.0f;
+          u.data[1] = col.g / 255.0f;
+          u.data[2] = col.b / 255.0f;
+          u.data[3] = col.a / 255.0f;
+          SetShaderValue(asset.raylibMaterial.shader, u.loc, u.data.ptr, ShaderUniformDataType.SHADER_UNIFORM_VEC4);
+        }
         break;
       }
       default: break;
@@ -283,7 +288,10 @@ public:
       renderer      = null;
     }
 
-    if (matHandle) MaterialManager.instance.release(matHandle);
+    // save material
+    MaterialManager.instance.save(matHandle, path);
+
+    MaterialManager.instance.release(matHandle);
     matHandle = MaterialHandle.init;
 
     closeRT();

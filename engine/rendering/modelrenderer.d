@@ -62,8 +62,6 @@ class ModelRenderer : Component {
   }
 
   override void onDestroy() {
-    import std.stdio;
-    writeln("destroy");
     foreach (i; 0 .. base.length) {
       if (overrideHandles[i]) {
         MaterialManager.instance.release(overrideHandles[i]);

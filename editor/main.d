@@ -206,8 +206,8 @@ int main(string[] args) {
       
     drawSettingsDialog(settingsDialog);
     drawFileDialog(fileDialog);
-    drawColorPickerDialog();
     drawMaterialDialog(inspect);
+    drawColorPickerDialog();
 
     if (profile) DrawFPS(GetScreenWidth() - 100, 2);
     EndDrawing();

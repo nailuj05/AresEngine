@@ -61,6 +61,8 @@ class ModelRenderer : Component {
   }
 
   override void onDestroy() {
+    import std.stdio;
+    writeln("destroy");
     foreach (i; 0 .. base.length) {
       if (overrideHandles[i]) {
         MaterialManager.instance.release(overrideHandles[i]);
@@ -79,12 +81,13 @@ class ModelRenderer : Component {
     modelHandle = ModelHandle.init;
   }
 
-  void setMaterialOverride(size_t slot, MaterialHandle h) {
+  void setMaterialOverride(size_t slot, string matPath) {
+    auto handle = MaterialManager.instance.acquire(matPath);
     assert(slot < base.length);
     if (overrideHandles[slot])
       MaterialManager.instance.release(overrideHandles[slot]);
-    overrideHandles[slot] = h;
-    overrides[slot]       = buildCachedDraw(base[slot].mesh, h);
+    overrideHandles[slot] = handle;
+    overrides[slot]       = buildCachedDraw(base[slot].mesh, handle);
   }
 
   void clearMaterialOverride(size_t slot) {

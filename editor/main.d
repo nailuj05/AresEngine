@@ -171,12 +171,6 @@ int main(string[] args) {
   
   ModelManager.init(projectPath);
   ModelManager.instance.loadAllAssets(); // a bit ugly, but fine for this engine
-  // unload in reverse order
-  scope(exit) {
-    ModelManager.instance.shutdown();
-    MaterialManager.instance.shutdown();
-    ShaderManager.instance.shutdown();
-  }
    
   activeScene.editorStart();
   log("Editor Start");
@@ -252,6 +246,11 @@ int main(string[] args) {
   activeScene.editorDestroy();
 
   materialDialog.close();
+
+  // unload in reverse order
+  ModelManager.instance.shutdown();
+  MaterialManager.instance.shutdown();
+  ShaderManager.instance.shutdown();
 
   saveManifest();
 

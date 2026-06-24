@@ -85,16 +85,12 @@ private:
       renderer      = null;
     }
 
-    previewObject = new GameObject();
+    previewObject      = new GameObject();
     previewObject.name = "__matPreview";
-
     renderer           = previewObject.addComponent!ModelRenderer();
     renderer.modelPath = PRIMITIVE_PATHS[cast(int)primitive];
-    // Override the default material slot with the one we are inspecting.
-    // onEditorStart acquires the model; we patch the material immediately after.
-    // MaterialHandle is already held by this dialog; pass a second acquire so
-    // ModelRenderer.onDestroy can release its own copy independently.
-    // renderer.setMaterialOverride(0, path);
+    previewObject.editorStart();
+    renderer.setMaterialOverride(0, path);
   }
 
   // -------------------------------------------------------------------------

@@ -3,7 +3,6 @@
 @uniform(engine) mat4 mvp;
 @uniform(engine) mat4 matModel;
 @uniform(engine) mat4 matNormal;
-@uniform(engine) vec4 colDiffuse;
 @uniform(engine) vec3 viewPos;
 
 @uniform(material, label="Color", min=0.0, max=1.0) vec4 color;
@@ -28,5 +27,5 @@ void main() {
 out vec4 finalColor;
 
 void main() {
-    finalColor = colDiffuse * color;
+    finalColor = color;
 }

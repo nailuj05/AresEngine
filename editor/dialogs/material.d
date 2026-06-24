@@ -89,7 +89,7 @@ private:
     previewObject.name = "__matPreview";
     renderer           = previewObject.addComponent!ModelRenderer();
     renderer.modelPath = PRIMITIVE_PATHS[cast(int)primitive];
-    previewObject.editorStart();
+    renderer.reload();
     renderer.setMaterialOverride(0, path);
   }
 
@@ -119,7 +119,7 @@ private:
     Rectangle src = Rectangle(0, 0, cast(float)pw, cast(float)-ph);
     DrawTexturePro(previewRT.texture, src, screenRect, Vector2(0, 0), 0.0f, Colors.WHITE);
 
-    // Primitive toggle -- rebuild preview object only on change.
+    // Primitive toggle
     float bx = area.x + PAD;
     float by  = area.y + PAD;
     PreviewPrimitive prev = primitive;

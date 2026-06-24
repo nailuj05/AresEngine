@@ -32,6 +32,7 @@ class ModelRenderer : Component {
   private MaterialHandle[] overrideHandles;
 
   override void onStart() {
+    if (modelPath == "") return;
     modelHandle = ModelManager.instance.acquire(modelPath);
     auto asset   = ModelManager.instance.get(modelHandle);
     size_t n     = asset.meshGroups.length;

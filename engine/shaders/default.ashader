@@ -27,5 +27,8 @@ void main() {
 out vec4 finalColor;
 
 void main() {
-    finalColor = color;
+  vec3 up      = vec3(0.0, 1.0, 0.0);
+  float diffuse = max(dot(fragNormal, up), 0.0);
+  float ambient = 0.25;
+  finalColor    = vec4(color.rgb * (ambient + diffuse), color.a);
 }

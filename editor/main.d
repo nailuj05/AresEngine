@@ -166,11 +166,13 @@ int main(string[] args) {
 
   // managers needs to be initialized before scene start
   ShaderManager.init(projectPath);
+  ShaderManager.instance.loadAllAssets(); // a bit ugly, but fine for this engine 
   
   MaterialManager.init(projectPath);
+  MaterialManager.instance.loadAllAssets();
   
   ModelManager.init(projectPath);
-  ModelManager.instance.loadAllAssets(); // a bit ugly, but fine for this engine
+  ModelManager.instance.loadAllAssets();
    
   activeScene.editorStart();
   log("Editor Start");
@@ -249,7 +251,11 @@ int main(string[] args) {
 
   // unload in reverse order
   ModelManager.instance.shutdown();
+
+  MaterialManager.instance.unloadAll();
   MaterialManager.instance.shutdown();
+  
+  ShaderManager.instance.unloadAll();
   ShaderManager.instance.shutdown();
 
   saveManifest();

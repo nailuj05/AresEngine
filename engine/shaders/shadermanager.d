@@ -24,6 +24,13 @@ struct ShaderHandle {
   bool opCast(T : bool)() const { return id != 0; }
 }
 
+version(Editor) {
+  struct ShaderEntry {
+    string displayName;
+    string path;
+  }
+ }
+
 class ShaderManager {
 private:
   static immutable string DefaultShaderKey = "builtin://default";
@@ -141,5 +148,42 @@ private:
     UnloadShader(asset.raylibShader);
     _pathIndex.remove(asset.sourcePath);
     _assets.remove(id);
+  }
+
+  version(Editor) {
+    static immutable string[] ShaderExtensions = [".ashader"];
+
+    public void loadAllAssets() {
+      import std.file : dirEntries, SpanMode;
+      import std.path : extension, relativePath;
+      foreach (entry; dirEntries(_projectRoot, SpanMode.depth)) {
+        if (!entry.isFile) continue;
+        foreach (ext; ShaderExtensions)
+          if (entry.name.extension == ext) {
+            acquire(relativePath(entry.name, _projectRoot));
+            break;
+          }
+      }
+    }
+
+    public ShaderEntry[] availableShaders() {
+      import std.path : baseName, stripExtension;
+      ShaderEntry[] result;
+      result.reserve(_assets.length);
+      foreach (ref asset; _assets)
+        result ~= ShaderEntry(
+                              asset.sourcePath.startsWith("builtin://")
+                              ? asset.sourcePath["builtin://".length .. $]
+                              : asset.sourcePath.baseName.stripExtension,
+                              asset.sourcePath);
+      return result;
+    }
+
+    public void unloadAll() {
+      foreach (id, ref asset; _assets)
+        UnloadShader(asset.raylibShader);
+      _assets.clear();
+      _pathIndex.clear();
+    }
   }
 }

@@ -9,9 +9,11 @@ import std.format    : format;
 import std.conv      : to;
 import std.path      : relativePath;
 
+import engine.asset;
 import engine.shaders.ashader;
-import engine.materials.material;
 import engine.materials.materialmanager;
+import engine.shaders.shadermanager;
+import engine.materials.material;
 import engine.models.model;
 import engine.models.modelmanager;
 import engine.core.gameobject;
@@ -41,8 +43,8 @@ struct MaterialDialog {
   bool active;
 
 private:
-  MaterialHandle     matHandle;
-  string             path;
+  MaterialHandle matHandle;
+  string path;
 
   // Preview scene objects
   GameObject         previewObject;
@@ -89,7 +91,7 @@ private:
     renderer           = previewObject.addComponent!ModelRenderer();
     renderer.modelPath = PRIMITIVE_PATHS[cast(int)primitive];
     renderer.reload();
-    renderer.setMaterialOverride(0, path);
+    renderer.setMaterial(0, path);
   }
 
   void drawPreview(Rectangle area) {
@@ -126,7 +128,7 @@ private:
     if (primitive != prev) resetPreviewObject();
   }
 
-  void drawUniforms(Rectangle area) {
+  void drawInspector(Rectangle area) {
     auto asset = MaterialManager.instance.get(matHandle);
     if (!asset) {
       DrawGuiText("Asset not loaded.".toStringz, cast(int)(area.x + PAD), cast(int)(area.y + PAD), TEXT_SZ, GetColor(0x888888FF));
@@ -137,9 +139,20 @@ private:
     float y  = area.y + PAD;
     float pw = area.width - PAD * 2;
 
+    // Label for selected material path
     GuiLabel(Rectangle(x, y, LABEL_W, FIELD_H), "Path:");
     string relPath = relativePath(path, getCurrentProjectPath());
     DrawGuiText(relPath.toStringz, cast(int)(x + LABEL_W + 4), cast(int)y, TEXT_SZ, GetColor(0xAAAAAFFF));
+    y += ROW_H;
+
+    // Asset field for assiging the shader here
+    auto shaderHandle = MaterialManager.instance.get(matHandle).shaderHandle;
+    string shaderPath = ShaderManager.instance.get(shaderHandle).sourcePath;
+    if (drawAssetField!(AssetKind.Shader)("Shader:", shaderPath, x, y, pw)) {
+      MaterialManager.instance.setShader(matHandle, shaderPath);
+      renderer.reload();
+    }
+    
     y += ROW_H;
 
     GuiLine(Rectangle(x, y, pw, 1), null);
@@ -314,7 +327,7 @@ public:
              GetColor(0x2A2A2AFF));
 
     drawPreview(previewArea);
-    drawUniforms(inspectorArea);
+    drawInspector(inspectorArea);
 
     return false;
   }

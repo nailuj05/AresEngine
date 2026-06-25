@@ -22,6 +22,7 @@ template isSerializableField(T) {
                             || is(T == float)
                             || is(T == int)
                             || is(T == string)
+                            || is(T == string[])
                             || is(T == Color)
                             || is(T == enum);
 }
@@ -63,13 +64,14 @@ private JSONValue serializeFields(T)(T obj) {
                  && isSerializableField!FT) {
         auto  v  = __traits(getMember, obj, field);
 
-        static if      (is(FT == bool))    result[field] = JSONValue(v);
-        else static if (is(FT == float))   result[field] = JSONValue(v);
-        else static if (is(FT == int))     result[field] = JSONValue(v);
-        else static if (is(FT == string))  result[field] = JSONValue(v);
-        else static if (is(FT == Color))   result[field] = serializeColor(v);
-        else static if (is(FT == enum))    result[field] = JSONValue(cast(long)v);
-        else static if (is(FT == Vector3)) result[field] = serializeVec3(v);
+        static if      (is(FT == bool))     result[field] = JSONValue(v);
+        else static if (is(FT == float))    result[field] = JSONValue(v);
+        else static if (is(FT == int))      result[field] = JSONValue(v);
+        else static if (is(FT == string))   result[field] = JSONValue(v);
+        else static if (is(FT == string[])) result[field] = JSONValue(v);
+        else static if (is(FT == Color))    result[field] = serializeColor(v);
+        else static if (is(FT == enum))     result[field] = JSONValue(cast(long)v);
+        else static if (is(FT == Vector3))  result[field] = serializeVec3(v);
       }
     }
   }
@@ -92,6 +94,12 @@ private void deserializeFields(T)(T obj, JSONValue fields) {
           else static if (is(FT == float))  __traits(getMember, obj, field) = jv.floating;
           else static if (is(FT == int))    __traits(getMember, obj, field) = cast(int)jv.integer;
           else static if (is(FT == string)) __traits(getMember, obj, field) = jv.str;
+          else static if (is(FT == string[])) {
+            string[] arr;
+            foreach (ref e; jv.array)
+              arr ~= e.str;
+            __traits(getMember, obj, field) = arr;
+          }
           else static if (is(FT == Color))  __traits(getMember, obj, field) = toColor(jv);
           else static if (is(FT == enum))   __traits(getMember, obj, field) = cast(FT)jv.integer;
           else static if (is(FT == Vector3))__traits(getMember, obj, field) = toVec3(jv);

@@ -11,12 +11,17 @@ import std.traits : hasUDA, getUDAs;
 import engine.asset;
 import engine.models.model;
 import engine.models.modelmanager: ModelManager;
+import engine.shaders.shadermanager;
+import engine.materials.material;
+import engine.materials.materialmanager : MaterialManager;
 import engine.core.component;
 import editor.dialog.colorpicker;
 import editor.dialog.assetpicker;
 
 ColorPickerDialog colorPicker;
 AssetPickerDialog!ModelEntry modelPicker;
+AssetPickerDialog!ShaderEntry shaderPicker;
+AssetPickerDialog!MaterialEntry materialPicker;
 
 enum MAX_FIELD_BUFFER = 256;
 enum float LABEL_W    = 120;
@@ -37,6 +42,7 @@ struct FieldState {
 private string* pendingAssetField;
 bool drawAssetPickers() {
   bool changed = false;
+
   if (modelPicker.draw() && !modelPicker.cancelled) {
     if (pendingAssetField) {
       *pendingAssetField = modelPicker.result.path;
@@ -44,7 +50,56 @@ bool drawAssetPickers() {
     }
     pendingAssetField = null;
   }
+
+  if (shaderPicker.draw() && !shaderPicker.cancelled) {
+    if (pendingAssetField) {
+      *pendingAssetField = shaderPicker.result.path;
+      changed = true;
+    }
+    pendingAssetField = null;
+  }
+
+  if (materialPicker.draw() && !materialPicker.cancelled) {
+    if (pendingAssetField) {
+      *pendingAssetField = materialPicker.result.path;
+      changed = true;
+    }
+    pendingAssetField = null;
+  }
+
   return changed;
+}
+
+bool drawAssetField(AssetKind kind)(string name, ref string field, float ox, float y, float pw) {
+  Rectangle lr  = Rectangle(ox + 8,              y, LABEL_W,           FIELD_H);
+  Rectangle fr  = Rectangle(ox + LABEL_W - 4,    y, pw - LABEL_W - 28, FIELD_H);
+  Rectangle btn = Rectangle(fr.x + fr.width + 4, y, 20,                FIELD_H);
+
+  GuiLabel(lr, name.humanize().toStringz());
+  GuiLabel(fr, field.length ? field.toStringz() : "<none>".toStringz());
+  DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
+
+  if (GuiButton(btn, "...".toStringz())) {
+    static if (kind == AssetKind.Model) {
+      pendingAssetField = &field;
+      modelPicker.show("Pick Model",
+                       ModelManager.instance.availableModels(),
+                       (const ref ModelEntry e) => format!"%d mesh(es)"(e.meshCount));
+    }
+    else static if (kind == AssetKind.Shader) {
+      pendingAssetField = &field;
+      shaderPicker.show("Pick Shader",
+                       ShaderManager.instance.availableShaders(),
+                       (const ref ShaderEntry e) => "---");
+    }
+    else static if (kind == AssetKind.Material) {
+      pendingAssetField = &field;
+      materialPicker.show("Pick Material",
+                       MaterialManager.instance.availableMaterials(),
+                       (const ref MaterialEntry e) => "---");
+    }
+  }
+  return drawAssetPickers();
 }
 
 private void syncBuffer(T)(ref FieldState s, T value) {
@@ -211,8 +266,7 @@ bool drawFields(T)(ref T obj, ref FieldState[string] states, float ox, float oy,
   bool delegate() deferred = null;
 
   foreach (i, ref field; obj.tupleof) {
-    static if (__traits(getProtection, obj.tupleof[i]) == "public"
-               && !hasUDA!(obj.tupleof[i], DontSerialize)) {
+    static if (__traits(getProtection, obj.tupleof[i]) == "public" && !hasUDA!(obj.tupleof[i], DontSerialize)) {
       enum name     = __traits(identifier, obj.tupleof[i]);
       alias FieldType = typeof(field);
 
@@ -231,26 +285,8 @@ bool drawFields(T)(ref T obj, ref FieldState[string] states, float ox, float oy,
       }
       else static if (hasUDA!(obj.tupleof[i], Asset)) {
         enum assetKind = getUDAs!(obj.tupleof[i], Asset)[0].kind;
-        if (name !in states) states[name] = FieldState.init; 
-        // Draw label + read-only path + "..." button
-        Rectangle lr  = Rectangle(ox + 8,               y, LABEL_W,               FIELD_H);
-        Rectangle fr  = Rectangle(ox + LABEL_W - 4,     y, pw - LABEL_W - 28,     FIELD_H);
-        Rectangle btn = Rectangle(fr.x + fr.width + 4,  y, 20,                    FIELD_H);
- 
-        GuiLabel(lr, name.humanize().toStringz());
-        GuiLabel(fr, field.length ? field.toStringz() : "<none>".toStringz());
-        DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
- 
-        if (GuiButton(btn, "...".toStringz())) {
-          static if (assetKind == AssetKind.Model) {
-            pendingAssetField = &field;
-            modelPicker.show("Pick Model",
-                             ModelManager.instance.availableModels(),
-                             (const ref ModelEntry e) => format!"%d mesh(es)"(e.meshCount));
-          }
-          // add other kinds here as managers become available
-        }
-        changed = drawAssetPickers();
+        if (name !in states) states[name] = FieldState.init;
+        changed = drawAssetField!assetKind(name, field, ox, y, pw);
       }
       else {
         if (name !in states) states[name] = FieldState.init;

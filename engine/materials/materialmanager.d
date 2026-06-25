@@ -96,6 +96,38 @@ public:
     write(absPath, j.toPrettyString());
   }
 
+  void setShader(MaterialHandle h, string shaderPath) {
+    auto asset = h.id in _assets;
+
+    // preserve current material uniform values by name
+    float[4][string] savedValues;
+    foreach (ref u; asset.uniforms)
+      savedValues[u.name] = u.data;
+
+    // swap shader handle
+    ShaderManager.instance.release(asset.shaderHandle);
+    ShaderHandle sh = shaderPath.length > 0
+      ? ShaderManager.instance.acquire(shaderPath)
+      : ShaderManager.instance.defaultShader();
+
+    // rebuild in place
+    string key      = asset.sourcePath;
+    int    refCount = asset.refCount;
+
+    // free old maps
+    foreach (ref map; asset.raylibMaterial.maps[0 .. MAX_MATERIAL_MAPS])
+      if (map.texture.id != 0) UnloadTexture(map.texture);
+    MemFree(asset.raylibMaterial.maps);
+
+    // remove from index temporarily so buildAsset can re-register same key
+    _pathIndex.remove(key);
+    _assets.remove(h.id);
+    _nextId = h.id; // reuse same id
+
+    auto newHandle = buildAsset(key, sh, &savedValues);
+    _assets[newHandle.id].refCount = refCount;
+  }
+
 private:
   void registerDefault() {
     ShaderHandle sh = ShaderManager.instance.defaultShader();

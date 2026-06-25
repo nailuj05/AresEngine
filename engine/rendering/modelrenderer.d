@@ -1,8 +1,11 @@
 module engine.rendering.modelrenderer;
 
 import std.string : toStringz;
+import std.format : format;
+
 import raylib;
 import raygui;
+
 import engine.asset;
 import engine.models.model;
 import engine.models.modelmanager;
@@ -14,46 +17,42 @@ import engine.core.component;
 
 class ModelRenderer : Component {
   mixin Named!"ModelRenderer";
-  @Asset(AssetKind.Model) string modelPath;
 
-  private ModelHandle modelHandle;
+  @Asset(AssetKind.Model) string modelPath;
+  string[] materials; // parallel to meshGroups; empty = default material
 
   private struct CachedDraw {
-    Mesh              mesh;
-    Material          mat;
-    ShaderUniform[]   matUniforms;
+    Mesh            mesh;
+    Material        mat;
+    ShaderUniform[] matUniforms;
     EngineUniformLocs engineLocs;
   }
 
-  // base[i] always valid after onStart; override[i] valid only if overrideHandles[i] is set
-  private CachedDraw[]   base;
-  private CachedDraw[]   overrides;
-  private MaterialHandle[] baseHandles;
-  private MaterialHandle[] overrideHandles;
+  private ModelHandle    modelHandle;
+  private MaterialHandle[] matHandles;
+  private CachedDraw[]   drawCache;
 
   override void onStart() {
-    if (modelPath == "") return;
     modelHandle = ModelManager.instance.acquire(modelPath);
-    auto asset   = ModelManager.instance.get(modelHandle);
-    size_t n     = asset.meshGroups.length;
+    auto asset  = ModelManager.instance.get(modelHandle);
 
-    base            = new CachedDraw[n];
-    overrides       = new CachedDraw[n];
-    baseHandles     = new MaterialHandle[n];
-    overrideHandles = new MaterialHandle[n];
+    // pad materials to mesh count, preserving any already set
+    if (materials.length < asset.meshGroups.length)
+      materials.length = asset.meshGroups.length;
 
-    MaterialHandle def = MaterialManager.instance.defaultMaterial();
-    foreach (i, ref g; asset.meshGroups) {
-      baseHandles[i] = def;
-      base[i]        = buildCachedDraw(g.mesh, def);
-    }
+    matHandles.length = asset.meshGroups.length;
+    foreach (i, ref h; matHandles)
+      h = materials[i].length
+        ? MaterialManager.instance.acquire(materials[i])
+        : MaterialManager.instance.defaultMaterial();
+
+    buildCache();
   }
 
   override void onDraw(DrawContext ctx) {
     if (!modelHandle) return;
     Matrix world = owner.transform.worldMatrix();
-    foreach (i, ref b; base) {
-      ref CachedDraw cd = overrideHandles[i] ? overrides[i] : b;
+    foreach (ref cd; drawCache) {
       Material mat = cd.mat;
       foreach (ref u; cd.matUniforms)
         SetShaderValue(mat.shader, u.loc, u.data.ptr, toRaylibUniformType(u.type));
@@ -62,49 +61,34 @@ class ModelRenderer : Component {
   }
 
   override void onDestroy() {
-    foreach (i; 0 .. base.length) {
-      if (overrideHandles[i]) {
-        MaterialManager.instance.release(overrideHandles[i]);
-        overrideHandles[i] = MaterialHandle.init;
-      }
-    }
-    // default material is pinned, release is a no-op but kept for correctness
-    foreach (ref h; baseHandles)
+    foreach (ref h; matHandles)
       MaterialManager.instance.release(h);
-
-    base            = null;
-    overrides       = null;
-    baseHandles     = null;
-    overrideHandles = null;
+    matHandles = null;
+    drawCache  = null;
     ModelManager.instance.release(modelHandle);
     modelHandle = ModelHandle.init;
   }
-
-  void setMaterialOverride(size_t slot, string matPath) {
-    auto handle = MaterialManager.instance.acquire(matPath);
-    assert(slot < base.length);
-    if (overrideHandles[slot])
-      MaterialManager.instance.release(overrideHandles[slot]);
-    overrideHandles[slot] = handle;
-    overrides[slot]       = buildCachedDraw(base[slot].mesh, handle);
+  
+  void setMaterial(size_t slot, string matPath) {
+    assert(slot < matHandles.length);
+    MaterialManager.instance.release(matHandles[slot]);
+    materials[slot]  = matPath;
+    matHandles[slot] = matPath.length
+      ? MaterialManager.instance.acquire(matPath)
+      : MaterialManager.instance.defaultMaterial();
+    drawCache[slot]  = buildCachedDraw(drawCache[slot].mesh, matHandles[slot]);
   }
-
-  void clearMaterialOverride(size_t slot) {
-    assert(slot < base.length);
-    if (!overrideHandles[slot]) return;
-    MaterialManager.instance.release(overrideHandles[slot]);
-    overrideHandles[slot] = MaterialHandle.init;
-    overrides[slot]       = CachedDraw.init;
-  }
-
+  
   void reload() {
-    version(Editor) {
-      onEditorDestroy();
-      onEditorStart();
-    } else {
-      onDestroy();
-      onStart();
-    }
+    version(Editor) { onEditorDestroy(); onEditorStart(); }
+    else             { onDestroy();       onStart(); }
+  }
+
+  private void buildCache() {
+    auto asset    = ModelManager.instance.get(modelHandle);
+    drawCache.length = asset.meshGroups.length;
+    foreach (i, ref g; asset.meshGroups)
+      drawCache[i] = buildCachedDraw(g.mesh, matHandles[i]);
   }
 
   private CachedDraw buildCachedDraw(Mesh mesh, MaterialHandle h) {
@@ -122,17 +106,19 @@ class ModelRenderer : Component {
     override void onEditorStart()   { onStart(); }
     override void onEditorDestroy() { onDestroy(); }
     private FieldState[string] fieldStates;
+
     override float drawInspector(float offsetX, float offsetY, float panelW) {
-      auto self = this;
+      auto  self = this;
       float endY = 0.0f;
       if (drawFields(self, fieldStates, offsetX, offsetY, panelW, &endY))
         reload();
-      Rectangle btn = Rectangle(offsetX + 8, endY, panelW - 16, 20);
-      if (GuiButton(btn, "Load Materials from Model".toStringz()))  {
-        import std.stdio;
-        writeln("reload");
+
+      foreach (i, ref mat; materials) {
+        if (drawAssetField!(AssetKind.Material)(format!"Material %d"(i), mat, offsetX, endY, panelW)) {
+          reload();
+        }
+        endY += ROW_H;
       }
-      endY += 28;
       return endY;
     }
   }

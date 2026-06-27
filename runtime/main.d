@@ -13,6 +13,7 @@ import engine.core.gameobject;
 import engine.scene.scene;
 import engine.scene.loader;
 import engine.models.modelmanager;
+import engine.shaders.shadermanager;
 import engine.materials.materialmanager;
 import engine.scripting.luaruntime;
 import engine.rendering.camera : Camera;
@@ -82,6 +83,7 @@ int main(string[] args) {
   setActiveScene(activeScene);
 
   // TODO: proper loading of assets once I figure out how to do the bundleing etc.
+  ShaderManager.init(projectPath);
   MaterialManager.init(projectPath);
   ModelManager.init(projectPath);
   
@@ -113,6 +115,7 @@ int main(string[] args) {
 
   ModelManager.instance.shutdown();
   MaterialManager.instance.shutdown();
+  ShaderManager.instance.shutdown();
 
   return 0;
 }

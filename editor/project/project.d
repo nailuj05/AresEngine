@@ -11,10 +11,11 @@ import raygui;
 
 import editor.style;
 
-static immutable ubyte[] ICON_FILE    = cast(immutable ubyte[]) import("icons/file.png");
-static immutable ubyte[] ICON_FOLDER  = cast(immutable ubyte[]) import("icons/folder.png");
-static immutable ubyte[] ICON_SCRIPT  = cast(immutable ubyte[]) import("icons/script.png");
-static immutable ubyte[] ICON_TEXTURE = cast(immutable ubyte[]) import("icons/texture.png");
+static immutable ubyte[] ICON_FILE     = cast(immutable ubyte[]) import("icons/file.png");
+static immutable ubyte[] ICON_FOLDER   = cast(immutable ubyte[]) import("icons/folder.png");
+static immutable ubyte[] ICON_MODEL   = cast(immutable ubyte[]) import("icons/model.png");
+static immutable ubyte[] ICON_TEXTURE  = cast(immutable ubyte[]) import("icons/texture.png");
+static immutable ubyte[] ICON_MATERIAL = cast(immutable ubyte[]) import("icons/material.png");
 // TODO: Add model icon
 
 private enum PAD         = 4;
@@ -32,8 +33,9 @@ private immutable string[] MODEL_EXTS = [".obj", ".glb", ".gltf"];
 
 private Texture2D iconFile;
 private Texture2D iconFolder;
-private Texture2D iconScript;
+private Texture2D iconModel;
 private Texture2D iconTexture;
+private Texture2D iconMaterial;
 private bool      iconsLoaded;
 
 private string     currentPath;
@@ -61,14 +63,18 @@ void initProject(string projectPath) {
   iconFolder = LoadTextureFromImage(img);
   UnloadImage(img);
 
-  img = LoadImageFromMemory(".png", ICON_SCRIPT.ptr,  cast(int)ICON_SCRIPT.length);
-  iconScript = LoadTextureFromImage(img);
+  img = LoadImageFromMemory(".png", ICON_MODEL.ptr,  cast(int)ICON_MODEL.length);
+  iconModel = LoadTextureFromImage(img);
   UnloadImage(img);
 
   img = LoadImageFromMemory(".png", ICON_TEXTURE.ptr, cast(int)ICON_TEXTURE.length);
   iconTexture = LoadTextureFromImage(img);
   UnloadImage(img);
 
+  img = LoadImageFromMemory(".png", ICON_MATERIAL.ptr, cast(int)ICON_MATERIAL.length);
+  iconMaterial = LoadTextureFromImage(img);
+  UnloadImage(img);
+  
   iconsLoaded = true;
   navigateTo(projectPath);
 }
@@ -77,8 +83,9 @@ void unloadProject() {
   if (!iconsLoaded) return;
   UnloadTexture(iconFile);
   UnloadTexture(iconFolder);
-  UnloadTexture(iconScript);
+  UnloadTexture(iconModel);
   UnloadTexture(iconTexture);
+  UnloadTexture(iconMaterial);
   iconsLoaded = false;
 }
 
@@ -116,9 +123,10 @@ private Texture2D iconFor(DirEntry e) {
   if (e.isDir) return iconFolder;
   import std.path : extension;
   import std.algorithm : canFind;
-  string ext = e.name.extension;
-  if (ext == ".lua")  return iconScript;
+  string ext = e.name.extension; 
+  if (ext == ".mat")  return iconMaterial;
   if (TEXTURE_EXTS.canFind(ext)) return iconTexture;
+  if (MODEL_EXTS.canFind(ext)) return iconModel;
   return iconFile;
 }
 

@@ -13,6 +13,7 @@ import engine.versioninfo;
 import engine.core.window;
 import engine.core.component;
 import engine.core.gameobject;
+import engine.sky;
 import engine.scene.scene;
 import engine.scene.loader;
 import engine.rendering.camera : Camera;
@@ -52,6 +53,8 @@ private Scene           activeScene;
 private GameObject      selected;
 private RenderTexture2D sceneTarget;
 private EditorCamera    editorCam;
+
+private SkyGradient sky;
 
 // Editor
 private GizmoState gizmo;
@@ -178,6 +181,8 @@ int main(string[] args) {
   log("Editor Start");
 
   initProject(projectPath);
+
+  sky.init();
   
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();
@@ -269,7 +274,16 @@ void renderScene(Scene scene, EditorCamera cam) {
   DrawContext ctx = { cam.cam };
 
   BeginTextureMode(sceneTarget);
-  ClearBackground(Color(60, 60, 60, 255));
+  
+  ClearBackground(Colors.BLACK);
+  sky.draw(
+           editorCam.cam,
+           sceneTarget.texture.width,
+           sceneTarget.texture.height,
+           Color(160, 160, 255, 255),
+           Color(40, 60, 60, 255),
+           );
+
   BeginMode3D(editorCam.cam);
 
   DrawGrid(20, 1.0f);

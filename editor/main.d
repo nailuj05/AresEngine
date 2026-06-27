@@ -200,7 +200,7 @@ int main(string[] args) {
     ClearBackground(Colors.BLACK);
     if (activeMenu >= 0) GuiSetState(GuiState.STATE_DISABLED);
     drawHierarchy(hierarchy, activeScene, selected);
-    auto selection = drawViewport(viewport, sceneTarget);
+    auto selection = drawViewport(viewport, gizmo, sceneTarget);
     drawInspector(inspector, selected, inspectorState);
     auto inspect = drawProject(project);
     GuiSetState(GuiState.STATE_NORMAL);
@@ -230,11 +230,13 @@ int main(string[] args) {
         selected = activeScene.roots.length > 0 ? activeScene.roots[0].gameObject : null;
       }
     }
-    
+
     if (action.play) handlePlay();
 
     gizmo.mode  = cast(GizmoMode)selection.gizmo;
     gizmo.space = cast(GizmoSpace)selection.space;
+    
+    handleGizmoShortcuts();
   }
 
   unloadProject();
@@ -283,6 +285,18 @@ void renderScene(Scene scene, EditorCamera cam) {
 void resizeSceneTarget(ref RenderTexture2D target, int w, int h) {
   UnloadRenderTexture(target);
   target = LoadRenderTexture(w, h);
+}
+
+void handleGizmoShortcuts() {
+  if (IsKeyPressed(KeyboardKey.KEY_W)) {
+    gizmo.mode = GizmoMode.TRANSLATE;
+  } else if (IsKeyPressed(KeyboardKey.KEY_E)) {
+    gizmo.mode = GizmoMode.ROTATE;
+  } else if (IsKeyPressed(KeyboardKey.KEY_R)) {
+    gizmo.mode = GizmoMode.SCALE;
+  } else if (IsKeyPressed(KeyboardKey.KEY_T)) {
+    gizmo.space = gizmo.space == GizmoSpace.GLOBAL ? GizmoSpace.LOCAL : GizmoSpace.GLOBAL;
+  }
 }
 
 // Todo save project instead of scene here

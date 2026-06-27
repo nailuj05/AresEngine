@@ -6,16 +6,15 @@ import raylib;
 import raygui;
 
 import editor.style;
+import editor.viewport.gizmos;
 
 private string[] gizmoButtons = ["Move", "Rotate", "Scale"];
-private int selectedGizmoButton = 0;
 
 private string[] spaces = ["Global", "Local"];
-private int selectedSpace = 0;
 
 struct Selection { int gizmo, space; }
 
-Selection drawViewport(Rectangle r, const RenderTexture2D rt) {
+Selection drawViewport(Rectangle r, ref GizmoState gizmo, const RenderTexture2D rt) {
   immutable Rectangle src  = Rectangle(0, 0, cast(float)rt.texture.width, -cast(float)rt.texture.height);
   immutable Rectangle dest = Rectangle(r.x, r.y + TEXT_SZ + 2, r.width, r.height - TEXT_SZ - 2);
   GuiPanel(r, "Viewport");
@@ -24,6 +23,8 @@ Selection drawViewport(Rectangle r, const RenderTexture2D rt) {
   // Draw overlay icons for gizmo
   float ox = r.x + 20;
   float oy = r.y + 40;
+  int selectedGizmoButton = gizmo.mode;
+  int selectedSpace       = gizmo.space;
   foreach (i, txt; gizmoButtons) {
     if (selectedGizmoButton == i) GuiSetState(GuiState.STATE_PRESSED);
     if (GuiButton(Rectangle(ox + i * 65, oy, 65, 25), txt.toStringz))

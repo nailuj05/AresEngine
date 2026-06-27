@@ -5,8 +5,8 @@ import raylib;
 import engine.core.gameobject;
 import editor.viewport.viewport;
 
-enum GizmoMode  { TRANSLATE, ROTATE, SCALE }
-enum GizmoSpace { GLOBAL, LOCAL }
+enum GizmoMode  { TRANSLATE = 0, ROTATE = 1, SCALE = 2 }
+enum GizmoSpace { GLOBAL = 0, LOCAL = 1 }
 
 static immutable Color[3] axisColors = [Colors.RED, Colors.GREEN, Colors.BLUE];
 

@@ -10,6 +10,7 @@ import engine.versioninfo;
 import engine.core.window;
 import engine.core.component;
 import engine.core.gameobject;
+import engine.sky;
 import engine.scene.scene;
 import engine.scene.loader;
 import engine.models.modelmanager;
@@ -26,6 +27,8 @@ Scene activeScene;
 Camera mainCamera;
 Manifest manifest;
 bool exitRequested;
+
+SkyGradient sky;
 
 void log(T...)(T args) {
   import std.stdio : write, writeln;
@@ -89,6 +92,9 @@ int main(string[] args) {
   
   activeScene.start();
   mainCamera = activeScene.getMainCamera();
+
+  sky.init();
+  
   if (mainCamera is null) {
     log("main camera is null");
     return 1;
@@ -96,16 +102,33 @@ int main(string[] args) {
   while (!exitRequested && !WindowShouldClose()) {
     immutable float dt = GetFrameTime();
     activeScene.update(dt);
+
     BeginDrawing();
+
     ClearBackground(Colors.BLACK);
+
+    sky.draw(
+           mainCamera.rcamera,
+           GetScreenWidth(),
+           GetScreenHeight(),
+           Color(160, 160, 255, 255),
+           Color(40, 60, 60, 255),
+           );
+  
     BeginMode3D(mainCamera.rcamera);
-    DrawGrid(20, 1.0f);
+
+    // DrawGrid(20, 1.0f);
+
     DrawContext ctx = { mainCamera.rcamera };
     activeScene.draw(ctx);
+
     EndMode3D();
+
     DrawFPS(10, 10);
+
     if (physProfile)
       drawPhysicsProfile(activeScene.physicsWorld.lastProfile);
+
     EndDrawing();
   }
 

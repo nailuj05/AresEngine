@@ -409,7 +409,7 @@ void handleCreate(int item) {
 void handlePlay() {
   import std.process : spawnProcess;
   saveScene(activeScene, activeScene.name ~ ".json");
-  spawnProcess(["ares-runtime", "--scene", activeScene.name ~ ".json", "--phys-prof"]);
+  spawnProcess(["ares-runtime", "--scene", activeScene.name ~ ".json"]);
 }
 
 // Project Functions

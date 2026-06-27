@@ -121,7 +121,7 @@ install-release: $(EDITOR_RELEASE) $(RUNTIME_RELEASE)
 	cp $(BUILD_DIR)/runtime_release $(INSTALL_DIR)/ares-runtime
 
 run-editor: install
-	ares-editor --profile $(TEST_DIR)
+	ares-editor $(TEST_DIR)
 
 $(TEST_DIR): install
 	mkdir -p $(TEST_DIR)

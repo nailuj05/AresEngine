@@ -91,6 +91,15 @@ public:
   }
 
   Transform instantiate(string path) {
+    if (path.startsWith("scene://")) {
+      Transform src = findByPath(path);
+      if (!src) return null;
+      JSONValue j = serializeTransform(src);
+      Transform t = deserializeTransform(j);
+      activeScene().roots ~= t;
+      return t;
+    }
+
     JSONValue* cached = path in _prefabCache;
     JSONValue  j;
     if (cached) {
@@ -98,11 +107,22 @@ public:
     } else {
       string abs = absPath(path);
       if (!exists(abs)) return null;
-      j                 = parseJSON(readText(abs));
+      j                  = parseJSON(readText(abs));
       _prefabCache[path] = j;
     }
     Transform t = deserializeTransform(j);
     activeScene().roots ~= t;
+    t.gameObject.start();
+    return t;
+  }
+
+  Transform instantiate(Transform source) {
+    JSONValue j = serializeTransform(source);
+    import std.stdio;
+    writeln(j.toString);
+    Transform t = deserializeTransform(j);
+    activeScene().roots ~= t;
+    t.gameObject.start();
     return t;
   }
 

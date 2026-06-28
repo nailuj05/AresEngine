@@ -271,10 +271,18 @@ private void registerPrefab(lua_State* L) {
 extern(C) int lua_prefab_instantiate(lua_State* L) nothrow {
   try {
     import engine.scene.objectmanager : ObjectManager;
-    size_t len;
-    const(char)* raw = lua_tolstring(L, 1, &len);
-    if (!raw) { lua_pushnil(L); return 1; }
-    auto t = ObjectManager.instance.instantiate(raw[0 .. len].idup);
+    import engine.core.transform : Transform;
+
+    Transform t;
+    if (lua_type(L, 1) == LUA_TLIGHTUSERDATA) {
+      auto src = cast(Transform)lua_touserdata(L, 1);
+      t = ObjectManager.instance.instantiate(src);
+    } else {
+      size_t len;
+      const(char)* raw = lua_tolstring(L, 1, &len);
+      if (!raw) { lua_pushnil(L); return 1; }
+      t = ObjectManager.instance.instantiate(raw[0 .. len].idup);
+    }
     if (!t) { lua_pushnil(L); return 1; }
     lua_pushlightuserdata(L, cast(void*)t);
     return 1;

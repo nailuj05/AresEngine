@@ -1,7 +1,6 @@
 module engine.scripting.luascript;
 
 import std.json;
-import std.string : fromStringz, toStringz;
 
 import lua;
 
@@ -13,6 +12,7 @@ import engine.scripting.luaruntime;
 import engine.scripting.luafielddef;
 import engine.scripting.luafieldvalue;
 import engine.scripting.luascriptdef;
+import engine.scripting.luax;
 
 class LuaScript : Component, IExtraSerializable {
   mixin Named!"LuaScript";
@@ -26,14 +26,13 @@ class LuaScript : Component, IExtraSerializable {
     reload();
   }
 
-  // D-side value store
+  // D-side value store, one entry per def field.
   LuaFieldValue[] fieldValues = [];
 
   private LuaScriptDef def;
-  private int instanceRef = LUA_NOREF;
+  private int  instanceRef = LUA_NOREF;
   private bool hasOnUpdate;
 
-  // Convenience: look up field index by name
   int fieldIndex(string name) {
     if (!def) return -1;
     foreach (i, ref d; def.fields)
@@ -41,247 +40,196 @@ class LuaScript : Component, IExtraSerializable {
     return -1;
   }
 
-  // --- Component Functions ---
+  // --- Component lifecycle ---
   override void onStart() {
     loadScript();
-    callMethod("onStart", 0);
+    callMethod(get_luaruntime(), "onStart", 0);
   }
 
-  override void onEditorStart() {
-    loadScript();
-  }
+  override void onEditorStart() { loadScript(); }
 
   override void onUpdate(float dt) {
-    if (!hasOnUpdate) return;
+    if (!hasOnUpdate) return;          // hot path: skip the lookup when absent
     auto L = get_luaruntime();
-    pushSelf(L);
-    lua_getfield(L, -1, "onUpdate");
-    lua_insert(L, -2);
-    lua_pushnumber(L, dt);
-    if (lua_pcall(L, 2, 0, 0) != LUA_OK) logLuaError(L);
+    push(L, dt);
+    callMethod(L, "onUpdate", 1);
+    lua_pop(L, 1);                     // callMethod copies args, so drop our dt
   }
 
   override void onDestroy() {
-    callMethod("onDestroy", 0);
+    callMethod(get_luaruntime(), "onDestroy", 0);
     unloadScript();
   }
 
   override void onEditorDestroy() { unloadScript(); }
 
   // --- Messaging ---
+  // Args are already on L. callMethod copies them, so the same args can be
+  // delivered to several components without re-pushing.
   void sendMessage(lua_State* L, const(char)[] methodName, int nargs) {
-    if (instanceRef == LUA_NOREF) return;
- 
-    // copy extra args to temporaries so we can push self underneath them
-    // simplest: push self, push method, move extra args up
-    // stack before: [..., arg1..argN]   (nargs items we must not disturb yet)
-    int base = lua_gettop(L) - nargs; // index just below extra args
- 
-    pushSelf(L);                               // [..., arg1..argN, self]
-    lua_getfield(L, -1, methodName.ptr);       // [..., arg1..argN, self, fn]
-    if (!lua_isfunction(L, -1)) {
-      lua_pop(L, 2); // pop nil + self
-      return;
-    }
- 
-    // reorder: fn, self, arg1..argN
-    // currently: [..., arg1..argN, self, fn]
-    // rotate the top (nargs+2) values left by 1 to get: fn, self, arg1..argN
-    // easier to just: insert fn before self, then insert self before args
-    lua_insert(L, base + 1);                   // [..., fn, arg1..argN, self]
-    lua_insert(L, base + 2);                   // [..., fn, self, arg1..argN]
-    // now copy the args since pcall will consume them
-    // actually they are already in place; just call
-    if (lua_pcall(L, nargs + 1, 0, 0) != LUA_OK) logLuaError(L);
+    // methodName comes from lua_tolstring, which Lua null-terminates, so .ptr
+    // is a valid C string without copying.
+    callMethod(L, methodName.ptr, nargs);
   }
 
   // --- Serialization ---
-  JSONValue serializeFields() {
-    JSONValue obj = JSONValue(cast(JSONValue[string])null);
-    if (!def) return obj;
-    foreach (i, ref d; def.fields)
-      obj[d.name] = fieldValues[i].toJson();
-    return obj;
-  }
-
-  void deserializeFields(JSONValue data) {
-    if (!def) return;
-    foreach (i, ref d; def.fields) {
-      if (auto v = d.name in data)
-        fieldValues[i] = LuaFieldValue.fromJson(d.type, *v);
-    }
-  }
-
   JSONValue serializeExtra() {
     JSONValue obj = JSONValue((JSONValue[string]).init);
-    // scriptPath accessed directly to avoid triggering a unneeded reload
-    obj["scriptPath"] = JSONValue(_scriptPath);
-    if (!def) return obj;
-    foreach (i, ref d; def.fields)
-      obj[d.name] = fieldValues[i].toJson();
+    obj["scriptPath"] = JSONValue(_scriptPath); // direct: avoids a reload
+    writeFields(obj);
     return obj;
   }
 
   void deserializeExtra(JSONValue data) {
     if (auto p = "scriptPath" in data.object)
-      _scriptPath = p.get!string; // direct assignment, no reload triggered
+      _scriptPath = p.get!string;               // direct: no reload triggered
 
-    if (_scriptPath.length) {
-      if (!def)
-        def = getOrLoadScriptDef(get_luaruntime(), _scriptPath);
-      if (!def) return;
-    }
+    if (_scriptPath.length && !def)
+      def = getOrLoadScriptDef(get_luaruntime(), _scriptPath);
 
-    fieldValues.length = def.fields.length;
+    readFields(data);
+  }
+
+  private void writeFields(ref JSONValue obj) {
+    if (!def) return;
     foreach (i, ref d; def.fields)
-      fieldValues[i] = LuaFieldValue.fromDef(d);
+      obj[d.name] = fieldValues[i].toJson();
+  }
+
+  private void readFields(JSONValue data) {
+    ensureFieldValues();
+    if (!def) return;
     foreach (i, ref d; def.fields)
       if (auto p = d.name in data.object)
         fieldValues[i] = LuaFieldValue.fromJson(d.type, *p);
   }
 
-  // --- Helpers ---
-  private void reload() {
-    if (_scriptPath.length) invalidateScriptDef(_scriptPath);
-    def         = null;
-    fieldValues = null;
-    if (instanceRef != LUA_NOREF) unloadScript();
-    if (_scriptPath.length) loadScript();
+  // --- Core helpers ---
+
+  // Calls instance:name(args...) where the `nargs` arguments sit on top of L.
+  //
+  // INVARIANT: the stack is left exactly as the caller had it, plus `nresults`
+  // values on success. The arguments are COPIED, never consumed — so callers
+  // own (and must clean up) anything they pushed, and the same args can be
+  // reused across calls. Returns false if the method does not exist.
+  private bool callMethod(lua_State* L, const(char)* name, int nargs, int nresults = 0) {
+    if (instanceRef == LUA_NOREF) return false;
+    int argsBase = lua_gettop(L) - nargs;   // args occupy argsBase+1 .. top
+
+    pushSelf(L);                            // [args, self]
+    getField(L, name);                      // [args, self, fn]   (follows __index)
+    if (!isFunction(L)) { lua_pop(L, 2); return false; }
+
+    lua_insert(L, -2);                      // [args, fn, self]
+    foreach (i; 0 .. nargs)
+      lua_pushvalue(L, argsBase + 1 + i);   // [args, fn, self, argcopies...]
+    return pcall(L, nargs + 1, nresults);   // consumes fn,self,argcopies; leaves [args]
   }
-  
+
   private void loadScript() {
     auto L = get_luaruntime();
-
     def = getOrLoadScriptDef(L, scriptPath);
     if (!def) return;
 
-    if (fieldValues.length != def.fields.length) {
-      fieldValues.length = def.fields.length;
-      foreach (i, ref d; def.fields)
-        fieldValues[i] = LuaFieldValue.fromDef(d);
-    }
-    
-    // Re-execute script to get a fresh class table for this instance
-    import std.string : toStringz;
-    if (luaL_loadfile(L, scriptPath.toStringz) != LUA_OK
-        || lua_pcall(L, 0, 1, 0) != LUA_OK) {
-      logLuaError(L);
-      return;
-    }
-    // [classTable]
+    ensureFieldValues();
 
-    // Build instance with classTable as metatable/__index
-    lua_newtable(L);
-    lua_pushvalue(L, -2);
-    lua_setfield(L, -2, "__index");
-    lua_pushvalue(L, -2);
-    lua_setmetatable(L, -2);
-    // [classTable, instance]
+    // Fresh instance table whose metatable is the shared class.
+    def.pushClass(L);                 // [class]
+    lua_newtable(L);                  // [class, instance]
+    lua_pushvalue(L, -2);             // [class, instance, class]
+    lua_setmetatable(L, -2);          // setmetatable(instance, class)   [class, instance]
 
-    lua_pushlightuserdata(L, cast(void*)owner);
-    lua_setfield(L, -2, "gameObject");
+    pushHandle(L, cast(void*)owner);  // [class, instance, owner]
+    setField(L, "gameObject");        // instance.gameObject = owner     [class, instance]
 
-    instanceRef = luaL_ref(L, LUA_REGISTRYINDEX);
-    lua_pop(L, 1); // pop classTable
+    instanceRef = storeRef(L);        // keep instance alive             [class]
+    lua_pop(L, 1);                    // pop class                       []
 
-    // Sync D-side values -> Lua, filling gaps with defaults
     syncFieldValues(L);
 
-    pushSelf(L);
-    lua_getfield(L, -1, "onUpdate");
-    hasOnUpdate = lua_isfunction(L, -1) != 0;
+    // Cache whether onUpdate exists (checked every frame).
+    def.pushClass(L);
+    getField(L, "onUpdate");
+    hasOnUpdate = isFunction(L);
     lua_pop(L, 2);
   }
 
+  private void unloadScript() {
+    if (instanceRef == LUA_NOREF) return;
+    freeRef(get_luaruntime(), instanceRef);
+    instanceRef = LUA_NOREF;
+    hasOnUpdate = false;
+  }
+
+  private void reload() {
+    if (_scriptPath.length) invalidateScriptDef(get_luaruntime(), _scriptPath);
+    def         = null;
+    fieldValues = null;
+    hasOnUpdate = false;
+    if (instanceRef != LUA_NOREF) unloadScript();
+    if (_scriptPath.length) loadScript();
+  }
+
+  // Reconcile fieldValues against def.fields, preserving values whose type
+  // still matches and filling the rest with defaults. The single source of
+  // truth for sizing/initializing fieldValues.
+  private void ensureFieldValues() {
+    if (!def) { fieldValues = null; return; }
+    if (fieldValues.length == def.fields.length) {
+      bool ok = true;
+      foreach (i, ref d; def.fields)
+        if (fieldValues[i].type != d.type) { ok = false; break; }
+      if (ok) return;
+    }
+    auto old = fieldValues;
+    fieldValues = new LuaFieldValue[def.fields.length];
+    foreach (i, ref d; def.fields)
+      fieldValues[i] = (i < old.length && old[i].type == d.type)
+        ? old[i]
+        : LuaFieldValue.fromDef(d);
+  }
+
   // Push current D-side fieldValues into the Lua instance.
-  // Call after loadScript or after a bulk editor change.
   void syncFieldValues(lua_State* L) {
     if (!def || instanceRef == LUA_NOREF) return;
+    import std.string : toStringz;
+    ensureFieldValues();
 
-    // Resize/fill fieldValues to match def
-    if (fieldValues.length != def.fields.length) {
-      auto old = fieldValues;
-      fieldValues.length = def.fields.length;
-      foreach (i, ref d; def.fields) {
-        if (i < old.length && old[i].type == d.type)
-          fieldValues[i] = old[i];
-        else
-          fieldValues[i] = LuaFieldValue.fromDef(d);
-      }
-    }
-
-    pushSelf(L);
+    pushSelf(L);                        // [instance]
     foreach (i, ref d; def.fields) {
-      final switch (d.type) {
-      case LuaFieldType.Float:
-      case LuaFieldType.Int:
-      case LuaFieldType.Bool:
-      case LuaFieldType.String_:
-        pushValue(L, fieldValues[i]);
-        break;
-      case LuaFieldType.Object_:
-        pushResolvedObject(L, fieldValues[i].s);
-        break;
-      }
-      lua_setfield(L, -2, d.name.toStringz);
+      pushValue(L, fieldValues[i]);     // [instance, value]   (resolves Object_ too)
+      setField(L, d.name.toStringz);    // instance[name] = value   [instance]
     }
     lua_pop(L, 1);
   }
 
-  private void unloadScript() {
-    auto L = get_luaruntime();
-    luaL_unref(L, LUA_REGISTRYINDEX, instanceRef);
-    instanceRef = LUA_NOREF;
-  }
-
-  private void pushSelf(lua_State* L) {
-    lua_rawgeti(L, LUA_REGISTRYINDEX, instanceRef);
-  }
-
-  private void callMethod(string name, int nresults) {
-    if (instanceRef == LUA_NOREF) return;
-    auto L = get_luaruntime();
-    pushSelf(L);
-    lua_getfield(L, -1, name.toStringz);
-    if (!lua_isfunction(L, -1)) { lua_pop(L, 2); return; }
-    lua_insert(L, -2);
-    if (lua_pcall(L, 1, nresults, 0) != LUA_OK) logLuaError(L);
-  }
+  private void pushSelf(lua_State* L) { pushRef(L, instanceRef); }
 
   private static void pushValue(lua_State* L, ref LuaFieldValue v) {
     final switch (v.type) {
-    case LuaFieldType.Float:   lua_pushnumber(L, v.f);           break;
-    case LuaFieldType.Int:     lua_pushinteger(L, v.i);          break;
-    case LuaFieldType.Bool:    lua_pushboolean(L, v.b ? 1 : 0);  break;
-    case LuaFieldType.String_: lua_pushstring(L, v.s.toStringz); break;
-    case LuaFieldType.Object_: assert(false, "use pushResolvedObject"); break;
-    }
-  }
- 
-  // scene:// -> resolve to Transform lightuserdata
-  // anything else (prefab path) -> push as string so Lua can call Prefab.instantiate
-  // empty / not found -> nil
-  private static void pushResolvedObject(lua_State* L, string path) {
-    import std.algorithm : startsWith;
-    if (!path.length) { lua_pushnil(L); return; }
-    if (path.startsWith("scene://")) {
-      import engine.scene.scene : activeScene;
-      auto scene = activeScene();
-      if (!scene) { lua_pushnil(L); return; }
-      auto t = scene.findByPath(path);
-      if (!t)  { lua_pushnil(L); return; }
-      lua_pushlightuserdata(L, cast(void*)t);
-    } else {
-      lua_pushstring(L, path.toStringz);
+    case LuaFieldType.Float:   push(L, v.f); break;
+    case LuaFieldType.Int:     push(L, v.i); break;
+    case LuaFieldType.Bool:    push(L, v.b); break;
+    case LuaFieldType.String_: push(L, v.s); break;
+    case LuaFieldType.Object_: pushResolvedObject(L, v.s); break;
     }
   }
 
-  private static void logLuaError(lua_State* L) {
-    import std.stdio : writeln;
-    import std.string : fromStringz;
-    auto msg = lua_tostring(L, -1);
-    writeln("[Lua] ", msg ? msg.fromStringz : "(null)");
-    lua_pop(L, 1);
+  // scene:// -> resolve to a Transform handle
+  // anything else (prefab path) -> push as string for Prefab.instantiate
+  // empty / not found -> nil
+  private static void pushResolvedObject(lua_State* L, string path) {
+    import std.algorithm : startsWith;
+    if (!path.length) { pushNil(L); return; }
+    if (path.startsWith("scene://")) {
+      try {
+        import engine.scene.scene : activeScene;
+        auto scene = activeScene();
+        pushHandle(L, scene ? cast(void*)scene.findByPath(path) : null);
+      } catch (Exception) { pushNil(L); }
+    } else {
+      push(L, path);
+    }
   }
 
   version(Editor) {
@@ -295,7 +243,7 @@ class LuaScript : Component, IExtraSerializable {
       string sp = _scriptPath;
       drawField("scriptPath", sp, _scriptPathState, offsetX, offsetY, panelW);
       scriptPath = sp;
-        
+
       offsetY += 28;
 
       auto self = this;
@@ -307,10 +255,10 @@ class LuaScript : Component, IExtraSerializable {
 
       foreach (i, ref d; def.fields) {
         final switch (d.type) {
-        case LuaFieldType.Float:       drawField(d.name, fieldValues[i].f, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
-        case LuaFieldType.Int:         drawField(d.name, fieldValues[i].i, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
-        case LuaFieldType.Bool:        drawField(d.name, fieldValues[i].b, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
-        case LuaFieldType.String_:     drawField(d.name, fieldValues[i].s, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.Float:   drawField(d.name, fieldValues[i].f, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.Int:     drawField(d.name, fieldValues[i].i, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.Bool:    drawField(d.name, fieldValues[i].b, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.String_: drawField(d.name, fieldValues[i].s, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
         case LuaFieldType.Object_:
           drawAssetField!(AssetKind.Object)(d.name, fieldValues[i].s, offsetX + 10, offsetY, panelW - 10);
           break;

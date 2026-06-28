@@ -4,8 +4,9 @@ import lua;
 import raylib;
 import engine.core.gameobject;
 import engine.core.transform : Transform;
+import engine.scripting.luax;
 
-void registerEngineAPI(lua_State* L) {
+void registerEngineAPI(lua_State* L) nothrow {
   registerTransform(L);
   registerInput(L);
   registerLog(L);
@@ -13,15 +14,13 @@ void registerEngineAPI(lua_State* L) {
   registerPrefab(L);
 }
 
-// helpers
+// --- helpers ---
 
+// Casts the light-userdata argument back to a Transform. Returns null for a
+// non-userdata argument (same behaviour as the original); add a check here if
+// your binding gains an error helper and you want a louder failure.
 private Transform getTF(lua_State* L, int idx = 1) nothrow {
   return cast(Transform)lua_touserdata(L, idx);
-}
-
-private GameObject getGO(lua_State* L, int idx = 1) nothrow {
-  auto t = getTF(L, idx);
-  return t ? t.gameObject : null;
 }
 
 private void pushConstTable(lua_State* L, const(char)* name,
@@ -31,10 +30,10 @@ private void pushConstTable(lua_State* L, const(char)* name,
     lua_pushinteger(L, vals[i]);
     lua_setfield(L, -2, keys[i]);
   }
-  lua_setfield(L, -2, name); // sets parent[-2][name] = new table
+  lua_setfield(L, -2, name);
 }
 
-// Transform
+// --- Transform ---
 
 private void registerTransform(lua_State* L) nothrow {
   static immutable luaL_Reg[8] funcs = [
@@ -47,49 +46,41 @@ private void registerTransform(lua_State* L) nothrow {
     { "setRotation", &lua_transform_setrot    },
     { null, null }
   ];
-  lua_newtable(L);
-  luaL_setfuncs(L, funcs.ptr, 0);
-  lua_setglobal(L, "Transform");
+  registerGlobalTable(L, "Transform", funcs[]);
 }
 
 extern(C) int lua_transform_getpos(lua_State* L) nothrow {
-  auto t = getTF(L);
-  lua_pushnumber(L, t.position.x);
-  lua_pushnumber(L, t.position.y);
-  lua_pushnumber(L, t.position.z);
+  auto tf = getTF(L);
+  push(L, tf.position.x);
+  push(L, tf.position.y);
+  push(L, tf.position.z);
   return 3;
 }
 
 extern(C) int lua_transform_setpos(lua_State* L) nothrow {
   auto tf = getTF(L);
-  tf.position = Vector3(cast(float)lua_tonumber(L, 2),
-                                  cast(float)lua_tonumber(L, 3),
-                                  cast(float)lua_tonumber(L, 4));
+  tf.position = Vector3(toFloat(L, 2), toFloat(L, 3), toFloat(L, 4));
   return 0;
 }
 
 extern(C) int lua_transform_translate(lua_State* L) nothrow {
   auto tf = getTF(L);
   auto p = tf.position;
-  tf.position = Vector3(p.x + cast(float)lua_tonumber(L, 2),
-                                  p.y + cast(float)lua_tonumber(L, 3),
-                                  p.z + cast(float)lua_tonumber(L, 4));
+  tf.position = Vector3(p.x + toFloat(L, 2), p.y + toFloat(L, 3), p.z + toFloat(L, 4));
   return 0;
 }
 
 extern(C) int lua_transform_getscale(lua_State* L) nothrow {
   auto tf = getTF(L);
-  lua_pushnumber(L, tf.scale.x);
-  lua_pushnumber(L, tf.scale.y);
-  lua_pushnumber(L, tf.scale.z);
+  push(L, tf.scale.x);
+  push(L, tf.scale.y);
+  push(L, tf.scale.z);
   return 3;
 }
 
 extern(C) int lua_transform_setscale(lua_State* L) nothrow {
   auto tf = getTF(L);
-  tf.scale = Vector3(cast(float)lua_tonumber(L, 2),
-                               cast(float)lua_tonumber(L, 3),
-                               cast(float)lua_tonumber(L, 4));
+  tf.scale = Vector3(toFloat(L, 2), toFloat(L, 3), toFloat(L, 4));
   return 0;
 }
 
@@ -97,33 +88,43 @@ extern(C) int lua_transform_setscale(lua_State* L) nothrow {
 extern(C) int lua_transform_getrot(lua_State* L) nothrow {
   auto tf = getTF(L);
   Vector3 e = QuaternionToEuler(tf.rotation);
-  lua_pushnumber(L, e.x * RAD2DEG);
-  lua_pushnumber(L, e.y * RAD2DEG);
-  lua_pushnumber(L, e.z * RAD2DEG);
+  push(L, e.x * RAD2DEG);
+  push(L, e.y * RAD2DEG);
+  push(L, e.z * RAD2DEG);
   return 3;
 }
 
 extern(C) int lua_transform_setrot(lua_State* L) nothrow {
   auto tf = getTF(L);
-  tf.rotation = QuaternionFromEuler(cast(float)lua_tonumber(L, 2) * DEG2RAD,
-                                              cast(float)lua_tonumber(L, 3) * DEG2RAD,
-                                              cast(float)lua_tonumber(L, 4) * DEG2RAD);
+  tf.rotation = QuaternionFromEuler(toFloat(L, 2) * DEG2RAD,
+                                    toFloat(L, 3) * DEG2RAD,
+                                    toFloat(L, 4) * DEG2RAD);
   return 0;
 }
 
-// Input
+// --- Input ---
+
+// Generates an extern(C) predicate that pushes `fn(cast(EnumT) arg1)` as a bool.
+// Each template instantiation gets its own mangled `impl`, so there are no
+// extern(C) name collisions.
+private template Predicate(alias fn, EnumT) {
+  extern(C) int impl(lua_State* L) nothrow {
+    push(L, cast(bool)fn(cast(EnumT)toInt(L, 1)));
+    return 1;
+  }
+}
 
 private void registerInput(lua_State* L) nothrow {
   static immutable luaL_Reg[10] funcs = [
-    { "isKeyDown",             &lua_input_keyDown         },
-    { "isKeyPressed",          &lua_input_keyPressed      },
-    { "isKeyReleased",         &lua_input_keyReleased     },
-    { "isMouseButtonDown",     &lua_input_mouseDown       },
-    { "isMouseButtonPressed",  &lua_input_mousePressed    },
-    { "isMouseButtonReleased", &lua_input_mouseReleased   },
-    { "getMousePosition",      &lua_input_mousePosition   },
-    { "getMouseDelta",         &lua_input_mouseDelta      },
-    { "getMouseWheelMove",     &lua_input_mouseWheelMove  },
+    { "isKeyDown",             &Predicate!(IsKeyDown,             KeyboardKey).impl },
+    { "isKeyPressed",          &Predicate!(IsKeyPressed,          KeyboardKey).impl },
+    { "isKeyReleased",         &Predicate!(IsKeyReleased,         KeyboardKey).impl },
+    { "isMouseButtonDown",     &Predicate!(IsMouseButtonDown,     MouseButton).impl  },
+    { "isMouseButtonPressed",  &Predicate!(IsMouseButtonPressed,  MouseButton).impl  },
+    { "isMouseButtonReleased", &Predicate!(IsMouseButtonReleased, MouseButton).impl  },
+    { "getMousePosition",      &lua_input_mousePosition  },
+    { "getMouseDelta",         &lua_input_mouseDelta     },
+    { "getMouseWheelMove",     &lua_input_mouseWheelMove },
     { null, null }
   ];
 
@@ -160,53 +161,31 @@ private void registerInput(lua_State* L) nothrow {
   lua_setglobal(L, "Input");
 }
 
-extern(C) int lua_input_keyDown(lua_State* L) nothrow {
-  lua_pushboolean(L, IsKeyDown(cast(KeyboardKey)lua_tointeger(L, 1)));
-  return 1;
-}
-extern(C) int lua_input_keyPressed(lua_State* L) nothrow {
-  lua_pushboolean(L, IsKeyPressed(cast(KeyboardKey)lua_tointeger(L, 1)));
-  return 1;
-}
-extern(C) int lua_input_keyReleased(lua_State* L) nothrow {
-  lua_pushboolean(L, IsKeyReleased(cast(KeyboardKey)lua_tointeger(L, 1)));
-  return 1;
-}
-extern(C) int lua_input_mouseDown(lua_State* L) nothrow {
-  lua_pushboolean(L, IsMouseButtonDown(cast(MouseButton)lua_tointeger(L, 1)));
-  return 1;
-}
-extern(C) int lua_input_mousePressed(lua_State* L) nothrow {
-  lua_pushboolean(L, IsMouseButtonPressed(cast(MouseButton)lua_tointeger(L, 1)));
-  return 1;
-}
-extern(C) int lua_input_mouseReleased(lua_State* L) nothrow {
-  lua_pushboolean(L, IsMouseButtonReleased(cast(MouseButton)lua_tointeger(L, 1)));
-  return 1;
-}
 extern(C) int lua_input_mousePosition(lua_State* L) nothrow {
   auto p = GetMousePosition();
-  lua_pushnumber(L, p.x);
-  lua_pushnumber(L, p.y);
+  push(L, p.x);
+  push(L, p.y);
   return 2;
 }
 extern(C) int lua_input_mouseDelta(lua_State* L) nothrow {
   auto d = GetMouseDelta();
-  lua_pushnumber(L, d.x);
-  lua_pushnumber(L, d.y);
+  push(L, d.x);
+  push(L, d.y);
   return 2;
 }
 extern(C) int lua_input_mouseWheelMove(lua_State* L) nothrow {
-  lua_pushnumber(L, GetMouseWheelMove());
+  push(L, GetMouseWheelMove());
   return 1;
 }
 
-// Log
-private void registerLog(lua_State* L) {
-  lua_newtable(L);
-  lua_pushcclosure(L, &lua_log_print, 0);
-  lua_setfield(L, -2, "print");
-  lua_setglobal(L, "Log");
+// --- Log ---
+
+private void registerLog(lua_State* L) nothrow {
+  static immutable luaL_Reg[2] funcs = [
+    { "print", &lua_log_print },
+    { null, null }
+  ];
+  registerGlobalTable(L, "Log", funcs[]);
 }
 
 extern(C) int lua_log_print(lua_State* L) nothrow {
@@ -219,72 +198,66 @@ extern(C) int lua_log_print(lua_State* L) nothrow {
   return 0;
 }
 
-// GameObject
-private void registerGameObject(lua_State* L) {
-  lua_newtable(L);
-  lua_pushcclosure(L, &lua_go_find, 0);
-  lua_setfield(L, -2, "find");
-  lua_pushcclosure(L, &lua_go_sendMessage, 0);
-  lua_setfield(L, -2, "sendMessage");
-  lua_setglobal(L, "GameObject");
+// --- GameObject ---
+
+private void registerGameObject(lua_State* L) nothrow {
+  static immutable luaL_Reg[3] funcs = [
+    { "find",        &lua_go_find        },
+    { "sendMessage", &lua_go_sendMessage },
+    { null, null }
+  ];
+  registerGlobalTable(L, "GameObject", funcs[]);
 }
 
 extern(C) int lua_go_find(lua_State* L) nothrow {
   try {
     import engine.scene.scene : activeScene;
-    size_t len;
-    const(char)* raw = lua_tolstring(L, 1, &len);
-    if (!raw) { lua_pushnil(L); return 1; }
+    auto name = toStrCopy(L, 1);
+    if (!name.length) { pushNil(L); return 1; }
     auto scene = activeScene();
-    if (!scene) { lua_pushnil(L); return 1; }
-    auto t = scene.findByPath(raw[0 .. len].idup);
-    if (!t) { lua_pushnil(L); return 1; }
-    lua_pushlightuserdata(L, cast(void*)t);
+    if (!scene) { pushNil(L); return 1; }
+    pushHandle(L, cast(void*)scene.findByPath(name)); // null -> nil
     return 1;
-  } catch (Exception e) { lua_pushnil(L); return 1; }
+  } catch (Exception) { pushNil(L); return 1; }
 }
 
 extern(C) int lua_go_sendMessage(lua_State* L) nothrow {
   try {
     import engine.scripting.luascript : LuaScript;
     auto t = getTF(L, 1);
-    size_t len;
-    const(char)* name = lua_tolstring(L, 2, &len);
-    if (!name) return 0;
+    auto name = toStr(L, 2);            // borrowed: used immediately below
+    if (!name.length) return 0;
     int nargs = lua_gettop(L) - 2;
-    foreach (c; t.gameObject.components) {
-      auto ls = cast(LuaScript)c;
-      if (ls) ls.sendMessage(L, name[0 .. len], nargs);
-    }
+    foreach (c; t.gameObject.components)
+      if (auto ls = cast(LuaScript)c)
+        ls.sendMessage(L, name, nargs); // args are reused per component (copied, not consumed)
     return 0;
-  } catch (Exception e) { return 0; }
+  } catch (Exception) { return 0; }
 }
 
-// Prefab
-private void registerPrefab(lua_State* L) {
-  lua_newtable(L);
-  lua_pushcclosure(L, &lua_prefab_instantiate, 0);
-  lua_setfield(L, -2, "instantiate");
-  lua_setglobal(L, "Prefab");
+// --- Prefab ---
+
+private void registerPrefab(lua_State* L) nothrow {
+  static immutable luaL_Reg[2] funcs = [
+    { "instantiate", &lua_prefab_instantiate },
+    { null, null }
+  ];
+  registerGlobalTable(L, "Prefab", funcs[]);
 }
 
 extern(C) int lua_prefab_instantiate(lua_State* L) nothrow {
   try {
     import engine.scene.objectmanager : ObjectManager;
-    import engine.core.transform : Transform;
 
     Transform t;
-    if (lua_type(L, 1) == LUA_TLIGHTUSERDATA) {
-      auto src = cast(Transform)lua_touserdata(L, 1);
-      t = ObjectManager.instance.instantiate(src);
+    if (isHandle(L, 1)) {
+      t = ObjectManager.instance.instantiate(toHandle!Transform(L, 1));
     } else {
-      size_t len;
-      const(char)* raw = lua_tolstring(L, 1, &len);
-      if (!raw) { lua_pushnil(L); return 1; }
-      t = ObjectManager.instance.instantiate(raw[0 .. len].idup);
+      auto path = toStrCopy(L, 1);
+      if (!path.length) { pushNil(L); return 1; }
+      t = ObjectManager.instance.instantiate(path);
     }
-    if (!t) { lua_pushnil(L); return 1; }
-    lua_pushlightuserdata(L, cast(void*)t);
+    pushHandle(L, cast(void*)t); // null -> nil
     return 1;
-  } catch (Exception e) { lua_pushnil(L); return 1; }
+  } catch (Exception) { pushNil(L); return 1; }
 }

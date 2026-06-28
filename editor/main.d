@@ -16,6 +16,7 @@ import engine.core.gameobject;
 import engine.sky;
 import engine.scene.scene;
 import engine.scene.loader;
+import engine.scene.objectmanager;
 import engine.rendering.camera : Camera;
 import engine.rendering.modelrenderer;
 import engine.rendering.drawcontext;
@@ -177,6 +178,8 @@ int main(string[] args) {
   ModelManager.init(projectPath);
   ModelManager.instance.loadAllAssets();
    
+  ObjectManager.init(projectPath);
+  
   activeScene.editorStart();
   log("Editor Start");
 
@@ -241,7 +244,8 @@ int main(string[] args) {
     gizmo.mode  = cast(GizmoMode)selection.gizmo;
     gizmo.space = cast(GizmoSpace)selection.space;
     
-    handleGizmoShortcuts();
+    if (CheckCollisionPointRec(GetMousePosition(), viewport))
+      handleGizmoShortcuts();
   }
 
   unloadProject();
@@ -257,6 +261,8 @@ int main(string[] args) {
   materialDialog.close();
 
   // unload in reverse order
+  ObjectManager.instance.shutdown();
+  
   ModelManager.instance.shutdown();
 
   MaterialManager.instance.unloadAll();

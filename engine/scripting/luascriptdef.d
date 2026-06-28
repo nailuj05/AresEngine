@@ -8,7 +8,6 @@ import engine.scripting.luafielddef;
 class LuaScriptDef {
   LuaFieldDef[] fields;
 
-  // Parses fields table from the class table sitting at stack top
   void parseFrom(lua_State* L) {
     fields.length = 0;
     lua_getfield(L, -1, "fields");
@@ -39,6 +38,7 @@ class LuaScriptDef {
       case "int":    def.type = LuaFieldType.Int;     break;
       case "bool":   def.type = LuaFieldType.Bool;    break;
       case "string": def.type = LuaFieldType.String_; break;
+      case "object": def.type = LuaFieldType.Object_; break;
       default: continue;
       }
 
@@ -49,6 +49,7 @@ class LuaScriptDef {
       case LuaFieldType.Int:     def.defaultInt    = cast(int)lua_tointeger(L, -1);   break;
       case LuaFieldType.Bool:    def.defaultBool   = lua_toboolean(L, -1) != 0;       break;
       case LuaFieldType.String_: def.defaultString = strField("default");             break;
+      case LuaFieldType.Object_: def.defaultString = "";                              break;
       }
 
       fields ~= def;
@@ -66,7 +67,6 @@ LuaScriptDef getOrLoadScriptDef(lua_State* L, string path) {
     lua_pop(L, 1);
     return null;
   }
-  // [classTable]
   auto def = new LuaScriptDef();
   def.parseFrom(L);
   lua_pop(L, 1);

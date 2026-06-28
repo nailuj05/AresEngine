@@ -13,6 +13,7 @@ import engine.core.gameobject;
 import engine.sky;
 import engine.scene.scene;
 import engine.scene.loader;
+import engine.scene.objectmanager;
 import engine.models.modelmanager;
 import engine.shaders.shadermanager;
 import engine.materials.materialmanager;
@@ -89,6 +90,7 @@ int main(string[] args) {
   ShaderManager.init(projectPath);
   MaterialManager.init(projectPath);
   ModelManager.init(projectPath);
+  ObjectManager.init(projectPath);
   
   activeScene.start();
   mainCamera = activeScene.getMainCamera();
@@ -136,6 +138,7 @@ int main(string[] args) {
   close_luaruntime();
   activeScene.destroy();
 
+  ObjectManager.instance.shutdown();
   ModelManager.instance.shutdown();
   MaterialManager.instance.shutdown();
   ShaderManager.instance.shutdown();

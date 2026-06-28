@@ -3,17 +3,25 @@ module engine.scripting.api;
 import lua;
 import raylib;
 import engine.core.gameobject;
+import engine.core.transform : Transform;
 
 void registerEngineAPI(lua_State* L) {
   registerTransform(L);
   registerInput(L);
   registerLog(L);
+  registerGameObject(L);
+  registerPrefab(L);
 }
 
 // helpers
 
+private Transform getTF(lua_State* L, int idx = 1) nothrow {
+  return cast(Transform)lua_touserdata(L, idx);
+}
+
 private GameObject getGO(lua_State* L, int idx = 1) nothrow {
-  return cast(GameObject)lua_touserdata(L, idx);
+  auto t = getTF(L, idx);
+  return t ? t.gameObject : null;
 }
 
 private void pushConstTable(lua_State* L, const(char)* name,
@@ -45,56 +53,50 @@ private void registerTransform(lua_State* L) nothrow {
 }
 
 extern(C) int lua_transform_getpos(lua_State* L) nothrow {
-  auto go = getGO(L);
-  if (!go) { lua_pushnumber(L, 0); lua_pushnumber(L, 0); lua_pushnumber(L, 0); return 3; }
-  lua_pushnumber(L, go.transform.position.x);
-  lua_pushnumber(L, go.transform.position.y);
-  lua_pushnumber(L, go.transform.position.z);
+  auto t = getTF(L);
+  lua_pushnumber(L, t.position.x);
+  lua_pushnumber(L, t.position.y);
+  lua_pushnumber(L, t.position.z);
   return 3;
 }
 
 extern(C) int lua_transform_setpos(lua_State* L) nothrow {
-  auto go = getGO(L);
-  if (!go) return 0;
-  go.transform.position = Vector3(cast(float)lua_tonumber(L, 2),
+  auto tf = getTF(L);
+  tf.position = Vector3(cast(float)lua_tonumber(L, 2),
                                   cast(float)lua_tonumber(L, 3),
                                   cast(float)lua_tonumber(L, 4));
   return 0;
 }
 
 extern(C) int lua_transform_translate(lua_State* L) nothrow {
-  auto go = getGO(L);
-  if (!go) return 0;
-  auto p = go.transform.position;
-  go.transform.position = Vector3(p.x + cast(float)lua_tonumber(L, 2),
+  auto tf = getTF(L);
+  auto p = tf.position;
+  tf.position = Vector3(p.x + cast(float)lua_tonumber(L, 2),
                                   p.y + cast(float)lua_tonumber(L, 3),
                                   p.z + cast(float)lua_tonumber(L, 4));
   return 0;
 }
 
 extern(C) int lua_transform_getscale(lua_State* L) nothrow {
-  auto go = getGO(L);
-  if (!go) { lua_pushnumber(L, 1); lua_pushnumber(L, 1); lua_pushnumber(L, 1); return 3; }
-  lua_pushnumber(L, go.transform.scale.x);
-  lua_pushnumber(L, go.transform.scale.y);
-  lua_pushnumber(L, go.transform.scale.z);
+  auto tf = getTF(L);
+  lua_pushnumber(L, tf.scale.x);
+  lua_pushnumber(L, tf.scale.y);
+  lua_pushnumber(L, tf.scale.z);
   return 3;
 }
 
 extern(C) int lua_transform_setscale(lua_State* L) nothrow {
-  auto go = getGO(L);
-  if (!go) return 0;
-  go.transform.scale = Vector3(cast(float)lua_tonumber(L, 2),
+  auto tf = getTF(L);
+  tf.scale = Vector3(cast(float)lua_tonumber(L, 2),
                                cast(float)lua_tonumber(L, 3),
                                cast(float)lua_tonumber(L, 4));
   return 0;
 }
 
-// rotation exposed as euler degrees; assumes go.transform.rotation is a Quaternion
+// rotation exposed as euler degrees; assumes tf.rotation is a Quaternion
 extern(C) int lua_transform_getrot(lua_State* L) nothrow {
-  auto go = getGO(L);
-  if (!go) { lua_pushnumber(L, 0); lua_pushnumber(L, 0); lua_pushnumber(L, 0); return 3; }
-  Vector3 e = QuaternionToEuler(go.transform.rotation);
+  auto tf = getTF(L);
+  Vector3 e = QuaternionToEuler(tf.rotation);
   lua_pushnumber(L, e.x * RAD2DEG);
   lua_pushnumber(L, e.y * RAD2DEG);
   lua_pushnumber(L, e.z * RAD2DEG);
@@ -102,9 +104,8 @@ extern(C) int lua_transform_getrot(lua_State* L) nothrow {
 }
 
 extern(C) int lua_transform_setrot(lua_State* L) nothrow {
-  auto go = getGO(L);
-  if (!go) return 0;
-  go.transform.rotation = QuaternionFromEuler(cast(float)lua_tonumber(L, 2) * DEG2RAD,
+  auto tf = getTF(L);
+  tf.rotation = QuaternionFromEuler(cast(float)lua_tonumber(L, 2) * DEG2RAD,
                                               cast(float)lua_tonumber(L, 3) * DEG2RAD,
                                               cast(float)lua_tonumber(L, 4) * DEG2RAD);
   return 0;
@@ -216,4 +217,66 @@ extern(C) int lua_log_print(lua_State* L) nothrow {
     printf("[LUA] %s\n", msg);
   lua_pop(L, 1); // tolstring cleanup
   return 0;
+}
+
+// GameObject
+private void registerGameObject(lua_State* L) {
+  lua_newtable(L);
+  lua_pushcclosure(L, &lua_go_find, 0);
+  lua_setfield(L, -2, "find");
+  lua_pushcclosure(L, &lua_go_sendMessage, 0);
+  lua_setfield(L, -2, "sendMessage");
+  lua_setglobal(L, "GameObject");
+}
+
+extern(C) int lua_go_find(lua_State* L) nothrow {
+  try {
+    import engine.scene.scene : activeScene;
+    size_t len;
+    const(char)* raw = lua_tolstring(L, 1, &len);
+    if (!raw) { lua_pushnil(L); return 1; }
+    auto scene = activeScene();
+    if (!scene) { lua_pushnil(L); return 1; }
+    auto t = scene.findByPath(raw[0 .. len].idup);
+    if (!t) { lua_pushnil(L); return 1; }
+    lua_pushlightuserdata(L, cast(void*)t);
+    return 1;
+  } catch (Exception e) { lua_pushnil(L); return 1; }
+}
+
+extern(C) int lua_go_sendMessage(lua_State* L) nothrow {
+  try {
+    import engine.scripting.luascript : LuaScript;
+    auto t = getTF(L, 1);
+    size_t len;
+    const(char)* name = lua_tolstring(L, 2, &len);
+    if (!name) return 0;
+    int nargs = lua_gettop(L) - 2;
+    foreach (c; t.gameObject.components) {
+      auto ls = cast(LuaScript)c;
+      if (ls) ls.sendMessage(L, name[0 .. len], nargs);
+    }
+    return 0;
+  } catch (Exception e) { return 0; }
+}
+
+// Prefab
+private void registerPrefab(lua_State* L) {
+  lua_newtable(L);
+  lua_pushcclosure(L, &lua_prefab_instantiate, 0);
+  lua_setfield(L, -2, "instantiate");
+  lua_setglobal(L, "Prefab");
+}
+
+extern(C) int lua_prefab_instantiate(lua_State* L) nothrow {
+  try {
+    import engine.scene.objectmanager : ObjectManager;
+    size_t len;
+    const(char)* raw = lua_tolstring(L, 1, &len);
+    if (!raw) { lua_pushnil(L); return 1; }
+    auto t = ObjectManager.instance.instantiate(raw[0 .. len].idup);
+    if (!t) { lua_pushnil(L); return 1; }
+    lua_pushlightuserdata(L, cast(void*)t);
+    return 1;
+  } catch (Exception e) { lua_pushnil(L); return 1; }
 }

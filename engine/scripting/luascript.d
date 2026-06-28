@@ -5,6 +5,7 @@ import std.string : fromStringz, toStringz;
 
 import lua;
 
+import engine.asset;
 import engine.core.component;
 import engine.core.iextraserializable;
 
@@ -67,6 +68,32 @@ class LuaScript : Component, IExtraSerializable {
 
   override void onEditorDestroy() { unloadScript(); }
 
+  // --- Messaging ---
+  void sendMessage(lua_State* L, const(char)[] methodName, int nargs) {
+    if (instanceRef == LUA_NOREF) return;
+ 
+    // copy extra args to temporaries so we can push self underneath them
+    // simplest: push self, push method, move extra args up
+    // stack before: [..., arg1..argN]   (nargs items we must not disturb yet)
+    int base = lua_gettop(L) - nargs; // index just below extra args
+ 
+    pushSelf(L);                               // [..., arg1..argN, self]
+    lua_getfield(L, -1, methodName.ptr);       // [..., arg1..argN, self, fn]
+    if (!lua_isfunction(L, -1)) {
+      lua_pop(L, 2); // pop nil + self
+      return;
+    }
+ 
+    // reorder: fn, self, arg1..argN
+    // currently: [..., arg1..argN, self, fn]
+    // rotate the top (nargs+2) values left by 1 to get: fn, self, arg1..argN
+    // easier to just: insert fn before self, then insert self before args
+    lua_insert(L, base + 1);                   // [..., fn, arg1..argN, self]
+    lua_insert(L, base + 2);                   // [..., fn, self, arg1..argN]
+    // now copy the args since pcall will consume them
+    // actually they are already in place; just call
+    if (lua_pcall(L, nargs + 1, 0, 0) != LUA_OK) logLuaError(L);
+  }
 
   // --- Serialization ---
   JSONValue serializeFields() {
@@ -115,15 +142,11 @@ class LuaScript : Component, IExtraSerializable {
 
   // --- Helpers ---
   private void reload() {
-    def        = null;
+    if (_scriptPath.length) invalidateScriptDef(_scriptPath);
+    def         = null;
     fieldValues = null;
-    
-    if (instanceRef != LUA_NOREF) {
-        unloadScript();
-    }
-
-    if (_scriptPath.length)
-        loadScript();
+    if (instanceRef != LUA_NOREF) unloadScript();
+    if (_scriptPath.length) loadScript();
   }
   
   private void loadScript() {
@@ -132,6 +155,12 @@ class LuaScript : Component, IExtraSerializable {
     def = getOrLoadScriptDef(L, scriptPath);
     if (!def) return;
 
+    if (fieldValues.length != def.fields.length) {
+      fieldValues.length = def.fields.length;
+      foreach (i, ref d; def.fields)
+        fieldValues[i] = LuaFieldValue.fromDef(d);
+    }
+    
     // Re-execute script to get a fresh class table for this instance
     import std.string : toStringz;
     if (luaL_loadfile(L, scriptPath.toStringz) != LUA_OK
@@ -183,7 +212,17 @@ class LuaScript : Component, IExtraSerializable {
 
     pushSelf(L);
     foreach (i, ref d; def.fields) {
-      pushValue(L, fieldValues[i]);
+      final switch (d.type) {
+      case LuaFieldType.Float:
+      case LuaFieldType.Int:
+      case LuaFieldType.Bool:
+      case LuaFieldType.String_:
+        pushValue(L, fieldValues[i]);
+        break;
+      case LuaFieldType.Object_:
+        pushResolvedObject(L, fieldValues[i].s);
+        break;
+      }
       lua_setfield(L, -2, d.name.toStringz);
     }
     lua_pop(L, 1);
@@ -215,6 +254,25 @@ class LuaScript : Component, IExtraSerializable {
     case LuaFieldType.Int:     lua_pushinteger(L, v.i);          break;
     case LuaFieldType.Bool:    lua_pushboolean(L, v.b ? 1 : 0);  break;
     case LuaFieldType.String_: lua_pushstring(L, v.s.toStringz); break;
+    case LuaFieldType.Object_: assert(false, "use pushResolvedObject"); break;
+    }
+  }
+ 
+  // scene:// -> resolve to Transform lightuserdata
+  // anything else (prefab path) -> push as string so Lua can call Prefab.instantiate
+  // empty / not found -> nil
+  private static void pushResolvedObject(lua_State* L, string path) {
+    import std.algorithm : startsWith;
+    if (!path.length) { lua_pushnil(L); return; }
+    if (path.startsWith("scene://")) {
+      import engine.scene.scene : activeScene;
+      auto scene = activeScene();
+      if (!scene) { lua_pushnil(L); return; }
+      auto t = scene.findByPath(path);
+      if (!t)  { lua_pushnil(L); return; }
+      lua_pushlightuserdata(L, cast(void*)t);
+    } else {
+      lua_pushstring(L, path.toStringz);
     }
   }
 
@@ -244,15 +302,18 @@ class LuaScript : Component, IExtraSerializable {
       drawFields(self, fieldStates, offsetX, offsetY, panelW, &offsetY);
       if (!def) return offsetY;
 
-      if (fieldStates.length != def.fields.length)
+      if (_fieldStates.length != def.fields.length)
         _fieldStates.length = def.fields.length;
 
       foreach (i, ref d; def.fields) {
         final switch (d.type) {
-        case LuaFieldType.Float:   drawField(d.name, fieldValues[i].f, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
-        case LuaFieldType.Int:     drawField(d.name, fieldValues[i].i, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
-        case LuaFieldType.Bool:    drawField(d.name, fieldValues[i].b, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
-        case LuaFieldType.String_: drawField(d.name, fieldValues[i].s, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.Float:       drawField(d.name, fieldValues[i].f, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.Int:         drawField(d.name, fieldValues[i].i, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.Bool:        drawField(d.name, fieldValues[i].b, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.String_:     drawField(d.name, fieldValues[i].s, _fieldStates[i], offsetX + 10, offsetY, panelW - 10); break;
+        case LuaFieldType.Object_:
+          drawAssetField!(AssetKind.Object)(d.name, fieldValues[i].s, offsetX + 10, offsetY, panelW - 10);
+          break;
         }
         offsetY += 28;
       }

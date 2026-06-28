@@ -14,6 +14,7 @@ import engine.models.modelmanager: ModelManager;
 import engine.shaders.shadermanager;
 import engine.materials.material;
 import engine.materials.materialmanager : MaterialManager;
+import engine.scene.objectmanager;
 import engine.core.component;
 import editor.dialog.colorpicker;
 import editor.dialog.assetpicker;
@@ -22,6 +23,7 @@ ColorPickerDialog colorPicker;
 AssetPickerDialog!ModelEntry modelPicker;
 AssetPickerDialog!ShaderEntry shaderPicker;
 AssetPickerDialog!MaterialEntry materialPicker;
+AssetPickerDialog!ObjectEntry goPicker;
 
 enum MAX_FIELD_BUFFER = 256;
 enum float LABEL_W    = 120;
@@ -67,6 +69,14 @@ bool drawAssetPickers() {
     pendingAssetField = null;
   }
 
+  if (goPicker.draw() && !goPicker.cancelled) {
+    if (pendingAssetField) {
+      *pendingAssetField = goPicker.result.path;
+      changed = true;
+    }
+    pendingAssetField = null;
+  }
+
   return changed;
 }
 
@@ -97,6 +107,12 @@ bool drawAssetField(AssetKind kind)(string name, ref string field, float ox, flo
       materialPicker.show("Pick Material",
                        MaterialManager.instance.availableMaterials(),
                        (const ref MaterialEntry e) => "---");
+    }
+    else static if (kind == AssetKind.Object) {
+      pendingAssetField = &field;
+      goPicker.show("Pick Object",
+                    ObjectManager.instance.availableObjects(),
+                    (const ref ObjectEntry e) => ObjectManager.objectMeta(e));
     }
   }
   return drawAssetPickers();

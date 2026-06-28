@@ -184,7 +184,7 @@ private void applyTransform(ref Transform t, JSONValue j) {
 
 // transform
 
-private JSONValue serializeTransform(Transform t) {
+public JSONValue serializeTransform(Transform t) {
   JSONValue[] children;
   foreach (child; t.children)
     children ~= serializeTransform(child);
@@ -203,7 +203,7 @@ private JSONValue serializeTransform(Transform t) {
                     ]);
 }
 
-private Transform deserializeTransform(JSONValue j, Transform parent = null) {
+public Transform deserializeTransform(JSONValue j, Transform parent = null) {
   auto go       = new GameObject();
   go.name       = j["name"].str;
   go.active     = j["active"].boolean;

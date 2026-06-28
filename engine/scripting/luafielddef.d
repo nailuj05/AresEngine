@@ -1,6 +1,6 @@
 module engine.scripting.luafielddef;
 
-enum LuaFieldType { Float, Int, Bool, String_ }
+enum LuaFieldType { Float, Int, Bool, String_, Object_ }
 
 struct LuaFieldDef {
   string       name;
@@ -9,5 +9,5 @@ struct LuaFieldDef {
   float  defaultFloat  = 0f;
   int    defaultInt    = 0;
   bool   defaultBool   = false;
-  string defaultString = "";
+  string defaultString = ""; // also used for Object_ (scene:// or prefab path)
 }

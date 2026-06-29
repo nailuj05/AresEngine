@@ -181,6 +181,7 @@ private:
         mat.shader.locs[ShaderLocationIndex.SHADER_LOC_VECTOR_VIEW] = u.loc;
         engineLocs.viewPos = u.loc;
         break;
+      case "time": engineLocs.time = u.loc; break;
       default: break;
       }
       if (u.owner == UniformOwner.Material) {

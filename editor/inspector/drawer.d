@@ -3,6 +3,7 @@ module editor.inspector.drawer;
 import raylib;
 import raygui;
 
+import std.stdio;
 import std.format : format;
 import std.string : join, toStringz, fromStringz;
 import std.conv   : to;
@@ -19,7 +20,31 @@ import engine.core.component;
 import editor.dialog.colorpicker;
 import editor.dialog.assetpicker;
 
+Color* colorPickerOwner;
+bool   colorPickerDirty;
 ColorPickerDialog colorPicker;
+
+bool ownsColorPicker(Color* p) {
+  return colorPickerOwner == p;
+}
+
+void claimColorPicker(Color* target) {
+  colorPickerOwner = target;
+  colorPicker.show(*target, (Color c) {
+    *target = c;
+    colorPickerDirty = true;
+  });
+}
+
+bool consumeColorChange(Color* p) {
+  if (colorPickerDirty && colorPickerOwner == p) {
+    colorPickerDirty = false;
+    colorPickerOwner = null;
+    return true;
+  }
+  return false;
+}
+
 AssetPickerDialog!ModelEntry modelPicker;
 AssetPickerDialog!ShaderEntry shaderPicker;
 AssetPickerDialog!MaterialEntry materialPicker;
@@ -211,47 +236,59 @@ bool drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
   static if (is(T == bool)) {
     T old = value;
     GuiCheckBox(Rectangle(fr.x, oy, FIELD_H, FIELD_H), "".toStringz, &value);
+    
     return value != old;
   }
   else static if (is(T == float) || is(T == int)) {
     // Return true on the frame editing transitions to committed (wasEditing && !state.editing).
     bool wasEditing = state.editing;
+
     if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
+    
     if (!state.editing) {
       try {
-        static if (is(T == float)) value = to!float(fromStringz(state.buffer.ptr));
-        else                        value = to!int  (fromStringz(state.buffer.ptr));
-      } catch (Exception) {}
+        static if (is(T == float)) {
+          value = to!float(fromStringz(state.buffer.ptr));
+        }
+        else {
+          value = to!int(fromStringz(state.buffer.ptr));
+        }
+      }
+      catch (Exception) {}
     }
+
     return wasEditing && !state.editing;
   }
   else static if (is(T == string)) {
     bool wasEditing = state.editing;
+
     if (GuiTextBox(fr, state.buffer.ptr, MAX_FIELD_BUFFER, state.editing))
       state.editing = !state.editing;
+
     if (!state.editing)
       value = fromStringz(state.buffer.ptr).idup;
+    
     return wasEditing && !state.editing;
   }
   else static if (is(T == Color)) {
     DrawRectangleRec(fr, value);
     DrawRectangleLinesEx(fr, 1, GetColor(GuiGetStyle(DEFAULT, BORDER_COLOR_NORMAL)));
+
     if (IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), fr))
-      colorPicker.show(value);
-    if (colorPicker.hasResult) {
-      value = colorPicker.result;
-      colorPicker.hasResult = false;
-      return true;
-    }
-    return false;
+      claimColorPicker(&value);
+
+    return consumeColorChange(&value);
   }
   else static if (is(T == enum)) {
     import std.traits : EnumMembers;
     enum opts = [__traits(allMembers, T)].join(";");
+    
     int active = 0;
+
     static foreach (i, m; EnumMembers!T)
       if (value == m) active = cast(int) i;
+
     if (state.editing && deferred) {
       *deferred = () {
         // Return true when the user commits a selection (GuiDropdownBox fires in open mode).
@@ -260,8 +297,10 @@ bool drawField(T)(string label, ref T value, ref FieldState state, float ox, flo
           state.editing = false;
           committed = true;
         }
+
         static foreach (i, m; EnumMembers!T)
           if (active == cast(int) i) value = m;
+
         return committed;
       };
     }
@@ -313,7 +352,9 @@ bool drawFields(T)(ref T obj, ref FieldState[string] states, float ox, float oy,
     }
   }
   if (deferred && deferred()) changed = true;
+
   if (endY) *endY = y;
+
   return changed;
 }
 

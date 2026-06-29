@@ -54,6 +54,10 @@ class ModelRenderer : Component {
     Matrix world = owner.transform.worldMatrix();
     foreach (ref cd; drawCache) {
       Material mat = cd.mat;
+      if (cd.engineLocs.viewPos != -1)
+        SetShaderValue(mat.shader, cd.engineLocs.viewPos, &ctx.camera.position, ShaderUniformDataType.SHADER_UNIFORM_VEC3);
+      if (cd.engineLocs.time != -1)
+        SetShaderValue(mat.shader, cd.engineLocs.time, &ctx.time, ShaderUniformDataType.SHADER_UNIFORM_FLOAT);
       foreach (ref u; cd.matUniforms)
         SetShaderValue(mat.shader, u.loc, u.data.ptr, toRaylibUniformType(u.type));
       DrawMesh(cd.mesh, mat, world);

@@ -192,8 +192,9 @@ int main(string[] args) {
 
     computeLayout(TOP_BAR_SIZE, 0.20f, 0.20f, 0.25f, topBar, hierarchy, viewport, inspector, project);
 
-    if (!fileDialog.active && !settingsDialog.active && !colorPicker.active &&
-        !modelPicker.active && !materialDialog.active && !gizmo.dragging)
+    bool dialogsOpen = !fileDialog.active && !settingsDialog.active && !colorPicker.active &&
+      !modelPicker.active && !materialDialog.active && !gizmo.dragging;
+    if (dialogsOpen)
       editorCam.update(viewport);
 
     if (viewport.width != sceneTarget.texture.width || viewport.height != sceneTarget.texture.height)
@@ -209,7 +210,7 @@ int main(string[] args) {
     if (activeMenu >= 0) GuiSetState(GuiState.STATE_DISABLED);
     drawHierarchy(hierarchy, activeScene, selected);
     auto selection = drawViewport(viewport, gizmo, sceneTarget);
-    drawInspector(inspector, selected, inspectorState);
+    drawInspector(inspector, selected, inspectorState, dialogsOpen);
     auto inspect = drawProject(project);
     GuiSetState(GuiState.STATE_NORMAL);
     auto action = drawTopBar(topBar, activeScene.name);
@@ -277,7 +278,7 @@ int main(string[] args) {
 }
 
 void renderScene(Scene scene, EditorCamera cam) {
-  DrawContext ctx = { cam.cam };
+  DrawContext ctx = { camera: cam.cam, time: GetTime() };
 
   BeginTextureMode(sceneTarget);
   

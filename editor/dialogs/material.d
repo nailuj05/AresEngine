@@ -64,7 +64,8 @@ private:
   // inspector scroll + field states
   Vector2            scroll;
   FieldState[string] fieldStates;
-
+  Color[string]      colorBuffers;
+  
   static bool s_open;
 
   void openRT(int w, int h) {
@@ -106,7 +107,7 @@ private:
                                      cast(float)pw, cast(float)ph);
     previewCam.update(screenRect);
 
-    DrawContext ctx = DrawContext(previewCam.cam);
+    DrawContext ctx = DrawContext(previewCam.cam, GetTime());
 
     BeginTextureMode(previewRT);
     ClearBackground(GetColor(0x1A1A1AFF));
@@ -145,13 +146,8 @@ private:
     DrawGuiText(relPath.toStringz, cast(int)(x + LABEL_W + 4), cast(int)y, TEXT_SZ, GetColor(0xAAAAAFFF));
     y += ROW_H;
 
-    // Asset field for assiging the shader here
-    auto shaderHandle = MaterialManager.instance.get(matHandle).shaderHandle;
-    string shaderPath = ShaderManager.instance.get(shaderHandle).sourcePath;
-    if (drawAssetField!(AssetKind.Shader)("Shader:", shaderPath, x, y, pw)) {
-      MaterialManager.instance.setShader(matHandle, shaderPath);
-      renderer.reload();
-    }
+    // for drawing at this location later
+    auto shaderFieldY = y;
     
     y += ROW_H;
 
@@ -227,22 +223,25 @@ private:
         break;
       }
       case UniformType.Vec4: {
-        // treat all vec4 uniforms as linear RGBA colors (0.0-1.0 -> 0-255)
         string k = kbase ~ ".col";
-        if (k !in fieldStates) fieldStates[k] = FieldState.init;
+        if (k !in fieldStates)  fieldStates[k]  = FieldState.init;
+        if (k !in colorBuffers) colorBuffers[k] = Color.init;
 
-        Color col = Color(cast(ubyte)(clamp(u.data[0], 0.0f, 1.0f) * 255.0f),
-                          cast(ubyte)(clamp(u.data[1], 0.0f, 1.0f) * 255.0f),
-                          cast(ubyte)(clamp(u.data[2], 0.0f, 1.0f) * 255.0f),
-                          cast(ubyte)(clamp(u.data[3], 0.0f, 1.0f) * 255.0f),);
+        if (!ownsColorPicker(&colorBuffers[k])) {
+          colorBuffers[k] = Color(
+                                  cast(ubyte)(clamp(u.data[0], 0.0f, 1.0f) * 255.0f),
+                                  cast(ubyte)(clamp(u.data[1], 0.0f, 1.0f) * 255.0f),
+                                  cast(ubyte)(clamp(u.data[2], 0.0f, 1.0f) * 255.0f),
+                                  cast(ubyte)(clamp(u.data[3], 0.0f, 1.0f) * 255.0f));
+        }
 
-        changed = drawField(u.name, col, fieldStates[k], x, rowY, pw);
-
+        changed = drawField(u.name, colorBuffers[k], fieldStates[k], x, rowY, pw);
         if (changed) {
-          u.data[0] = col.r / 255.0f;
-          u.data[1] = col.g / 255.0f;
-          u.data[2] = col.b / 255.0f;
-          u.data[3] = col.a / 255.0f;
+          auto c = colorBuffers[k];
+          u.data[0] = c.r / 255.0f;
+          u.data[1] = c.g / 255.0f;
+          u.data[2] = c.b / 255.0f;
+          u.data[3] = c.a / 255.0f;
           SetShaderValue(asset.raylibMaterial.shader, u.loc, u.data.ptr, ShaderUniformDataType.SHADER_UNIFORM_VEC4);
         }
         break;
@@ -253,6 +252,15 @@ private:
     }
 
     EndScissorMode();
+
+    // TODO: Properly fix this being drawn below the following inspector code
+    // Asset field for assiging the shader here
+    auto shaderHandle = MaterialManager.instance.get(matHandle).shaderHandle;
+    string shaderPath = ShaderManager.instance.get(shaderHandle).sourcePath;
+    if (drawAssetField!(AssetKind.Shader)("Shader:", shaderPath, x, shaderFieldY, pw)) {
+      MaterialManager.instance.setShader(matHandle, shaderPath);
+      renderer.reload();
+    }
   }
 
 public:
@@ -267,7 +275,7 @@ public:
     scroll      = Vector2(0, 0);
     fieldStates = null;
     drag        = false;
-    previewCam  = EditorCamera.create(Vector3(0, 2, 4));
+    previewCam  = EditorCamera.create(Vector3(0, 1, 2));
 
     b = Rectangle(GetScreenWidth()  / 2.0f - WIN_W / 2.0f, GetScreenHeight() / 2.0f - WIN_H / 2.0f, WIN_W, WIN_H);
 

@@ -78,7 +78,7 @@ public:
 private:
   void loadPrimitives() {
     registerPrimitive(PrimitiveCube,     GenMeshCube(1.0f, 1.0f, 1.0f));
-    registerPrimitive(PrimitiveSphere,   GenMeshSphere(0.5f, 16, 16));
+    registerPrimitive(PrimitiveSphere,   GenMeshSphere(0.5f, 24, 24));
     registerPrimitive(PrimitivePlane,    GenMeshPlane(1.0f, 1.0f, 1, 1));
     registerPrimitive(PrimitiveCylinder, GenMeshCylinder(0.5f, 1.0f, 16));
   }

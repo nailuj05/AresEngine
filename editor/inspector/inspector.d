@@ -23,7 +23,7 @@ static immutable string[] COMPONENT_NAMES = () {
   return names;
 }();
 
-void drawInspector(Rectangle r, GameObject selected, ref InspectorState state) {
+void drawInspector(Rectangle r, GameObject selected, ref InspectorState state, bool disableAdd) {
   DrawRectangle(cast(int) r.x, cast(int) r.y, cast(int) r.width, cast(int) r.height, GetColor(PANEL_BG));
   GuiPanel(r, "Inspector");
   if (selected is null) return;
@@ -74,7 +74,7 @@ void drawInspector(Rectangle r, GameObject selected, ref InspectorState state) {
   y += 8;
 
   // Add Component dropdown
-  if (GuiButton(Rectangle(x + 12, y, w - 20, FIELD_H), "Add Component"))
+  if (GuiButton(Rectangle(x + 12, y, w - 20, FIELD_H), "Add Component") && disableAdd)
     state.addCompOpen = !state.addCompOpen;
 
   if (state.addCompOpen) {

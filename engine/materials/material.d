@@ -9,6 +9,7 @@ struct EngineUniformLocs {
   int matModel  = -1;
   int matNormal = -1;
   int viewPos   = -1;
+  int time      = -1;
 }
 
 struct MaterialAsset {

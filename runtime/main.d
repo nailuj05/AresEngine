@@ -121,7 +121,7 @@ int main(string[] args) {
 
     // DrawGrid(20, 1.0f);
 
-    DrawContext ctx = { mainCamera.rcamera };
+    DrawContext ctx = { mainCamera.rcamera, GetTime() };
     activeScene.draw(ctx);
 
     EndMode3D();

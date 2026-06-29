@@ -233,7 +233,8 @@ int main(string[] args) {
 
     // Delete either selection (or file?)
     if (IsKeyPressed(KeyboardKey.KEY_DELETE)) {
-      if (!CheckCollisionPointRec(GetMousePosition(), project)) { // if not in project view
+      if (CheckCollisionPointRec(GetMousePosition(), hierarchy) &&
+          CheckCollisionPointRec(GetMousePosition(), viewport)) { // if not in project view
         if (selected !is null)
           activeScene.destroyObject(selected);
         selected = activeScene.roots.length > 0 ? activeScene.roots[0].gameObject : null;

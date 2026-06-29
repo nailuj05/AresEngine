@@ -9,7 +9,7 @@
                     "enabled": true,
                     "fields": {
                         "farPlane": 1000.0,
-                        "fieldOfView": 80.0,
+                        "fieldOfView": 60.0,
                         "nearPlane": 0.100000001490116119,
                         "projection": 0
                     },
@@ -20,7 +20,7 @@
             "position": {
                 "x": 0.0,
                 "y": 0.0,
-                "z": -4.10410165786743164
+                "z": -1.80335617065429688
             },
             "rotation": {
                 "w": 1.0,
@@ -42,7 +42,7 @@
                     "enabled": true,
                     "fields": {
                         "materials": [
-                            "builtin:\/\/default"
+                            "Water.mat"
                         ],
                         "modelPath": "primitive:\/\/sphere"
                     },

@@ -3,7 +3,7 @@ import json
 from typing import List, Tuple, Union
 
 def create_cube(x: float, y: float, z: float, name: str, color: Tuple[int, int, int] = (255, 0, 0)) -> dict:
-    """Create a cube entity with MeshRenderer, BoxCollider, and Rigidbody."""
+    """Create a cube entity with ModelRenderer, BoxCollider, and Rigidbody."""
     return {
         "active": True,
         "children": [],
@@ -11,10 +11,12 @@ def create_cube(x: float, y: float, z: float, name: str, color: Tuple[int, int, 
             {
                 "enabled": True,
                 "fields": {
-                    "color": {"a": 255, "b": color[2], "g": color[1], "r": color[0]},
-                    "meshPath": ""
+                    "materials": [
+                        "Material.mat"
+                    ],
+                    "modelPath": "primitive://cube"
                 },
-                "type": "MeshRenderer"
+                "type": "ModelRenderer"
             },
             {
                 "enabled": True,
@@ -95,10 +97,9 @@ def main():
             {
                 "enabled": True,
                 "fields": {
-                    "color": {"a": 255, "b": 83, "g": 83, "r": 107},
-                    "meshPath": ""
+                    "modelPath": "primitive://cube"
                 },
-                "type": "MeshRenderer"
+                "type": "ModelRenderer"
             },
             {
                 "enabled": True,

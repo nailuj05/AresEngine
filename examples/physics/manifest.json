@@ -1,8 +1,8 @@
 {
     "fullscreen": false,
-    "name": "Shaders",
-    "resX": 600,
-    "resY": 400,
+    "name": "Physics",
+    "resX": 1200,
+    "resY": 800,
     "scenes": {
         "main": "main.json"
     },

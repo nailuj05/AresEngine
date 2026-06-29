@@ -4,6 +4,7 @@ import lua;
 import raylib;
 import engine.core.gameobject;
 import engine.core.transform : Transform;
+import engine.physics.rigidbody : Rigidbody;
 import engine.scripting.luax;
 
 void registerEngineAPI(lua_State* L) nothrow {
@@ -12,6 +13,7 @@ void registerEngineAPI(lua_State* L) nothrow {
   registerLog(L);
   registerGameObject(L);
   registerPrefab(L);
+  registerRigidbody(L);
 }
 
 // --- helpers ---
@@ -21,6 +23,25 @@ void registerEngineAPI(lua_State* L) nothrow {
 // your binding gains an error helper and you want a louder failure.
 private Transform getTF(lua_State* L, int idx = 1) nothrow {
   return cast(Transform)lua_touserdata(L, idx);
+}
+
+// Resolves the Rigidbody on the handle's GameObject (null if none).
+private Rigidbody getRB(lua_State* L, int idx = 1) nothrow {
+  auto tf = getTF(L, idx);
+  return tf ? tf.gameObject.getComponent!Rigidbody() : null;
+}
+
+// Reads three stack numbers (start, start+1, start+2) as a Vector3.
+private Vector3 readVec3(lua_State* L, int start) nothrow {
+  return Vector3(toFloat(L, start), toFloat(L, start + 1), toFloat(L, start + 2));
+}
+
+// Pushes a Vector3 as three return values.
+private int pushVec3(lua_State* L, Vector3 v) nothrow {
+  push(L, v.x);
+  push(L, v.y);
+  push(L, v.z);
+  return 3;
 }
 
 private void pushConstTable(lua_State* L, const(char)* name,
@@ -201,9 +222,10 @@ extern(C) int lua_log_print(lua_State* L) nothrow {
 // --- GameObject ---
 
 private void registerGameObject(lua_State* L) nothrow {
-  static immutable luaL_Reg[3] funcs = [
+  static immutable luaL_Reg[4] funcs = [
     { "find",        &lua_go_find        },
     { "sendMessage", &lua_go_sendMessage },
+    { "destroy",     &lua_go_destroy     },
     { null, null }
   ];
   registerGlobalTable(L, "GameObject", funcs[]);
@@ -235,6 +257,20 @@ extern(C) int lua_go_sendMessage(lua_State* L) nothrow {
   } catch (Exception) { return 0; }
 }
 
+// Queues the object for destruction at the end of the current frame. Deferring
+// is what makes this safe to call from onUpdate or from a collision callback —
+// destroying immediately would mutate the scene/physics lists mid-iteration.
+extern(C) int lua_go_destroy(lua_State* L) nothrow {
+  try {
+    import engine.scene.scene : activeScene;
+    auto tf = getTF(L, 1);
+    if (!tf) return 0;
+    if (auto scene = activeScene())
+      scene.requestDestroy(tf.gameObject);
+    return 0;
+  } catch (Exception) { return 0; }
+}
+
 // --- Prefab ---
 
 private void registerPrefab(lua_State* L) nothrow {
@@ -260,4 +296,95 @@ extern(C) int lua_prefab_instantiate(lua_State* L) nothrow {
     pushHandle(L, cast(void*)t); // null -> nil
     return 1;
   } catch (Exception) { pushNil(L); return 1; }
+}
+
+// --- Rigidbody ---
+// All functions take an object handle as argument 1 and no-op if the object
+// has no Rigidbody. addForce/Impulse/Torque are wrapped in try/catch because
+// those methods aren't marked nothrow; the catch satisfies the nothrow callback
+// and never actually fires (they only touch fields and raymath).
+
+private void registerRigidbody(lua_State* L) nothrow {
+  static immutable luaL_Reg[14] funcs = [
+    { "addForce",           &lua_rb_addForce      },
+    { "addImpulse",         &lua_rb_addImpulse    },
+    { "addTorque",          &lua_rb_addTorque     },
+    { "getVelocity",        &lua_rb_getVelocity   },
+    { "setVelocity",        &lua_rb_setVelocity   },
+    { "getAngularVelocity", &lua_rb_getAngularVel },
+    { "setAngularVelocity", &lua_rb_setAngularVel },
+    { "getMass",            &lua_rb_getMass       },
+    { "setMass",            &lua_rb_setMass       },
+    { "isKinematic",        &lua_rb_isKinematic   },
+    { "setKinematic",       &lua_rb_setKinematic  },
+    { "getUseGravity",      &lua_rb_getUseGravity },
+    { "setUseGravity",      &lua_rb_setUseGravity },
+    { null, null }
+  ];
+  registerGlobalTable(L, "Rigidbody", funcs[]);
+}
+
+extern(C) int lua_rb_addForce(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  try { rb.addForce(readVec3(L, 2)); } catch (Exception) {}
+  return 0;
+}
+extern(C) int lua_rb_addImpulse(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  try { rb.addImpulse(readVec3(L, 2)); } catch (Exception) {}
+  return 0;
+}
+extern(C) int lua_rb_addTorque(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  try { rb.addTorque(readVec3(L, 2)); } catch (Exception) {}
+  return 0;
+}
+extern(C) int lua_rb_getVelocity(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  return pushVec3(L, rb.velocity);
+}
+extern(C) int lua_rb_setVelocity(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  rb.velocity = readVec3(L, 2);
+  return 0;
+}
+extern(C) int lua_rb_getAngularVel(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  return pushVec3(L, rb.angularVelocity);
+}
+extern(C) int lua_rb_setAngularVel(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  rb.angularVelocity = readVec3(L, 2);
+  return 0;
+}
+extern(C) int lua_rb_getMass(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  push(L, rb.mass);
+  return 1;
+}
+extern(C) int lua_rb_setMass(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  rb.mass = toFloat(L, 2);
+  try { rb.recomputeInertiaTensor(); } catch (Exception) {} // mass changes inertia
+  return 0;
+}
+extern(C) int lua_rb_isKinematic(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  push(L, rb.isKinematic);
+  return 1;
+}
+extern(C) int lua_rb_setKinematic(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  rb.isKinematic = toBool(L, 2);
+  return 0;
+}
+extern(C) int lua_rb_getUseGravity(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  push(L, rb.useGravity);
+  return 1;
+}
+extern(C) int lua_rb_setUseGravity(lua_State* L) nothrow {
+  auto rb = getRB(L); if (!rb) return 0;
+  rb.useGravity = toBool(L, 2);
+  return 0;
 }

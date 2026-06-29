@@ -17,7 +17,10 @@ class Scene {
   string       name;
   Transform[] roots;
   PhysicsWorld physicsWorld;
-  
+
+  // Objects queued for destruction; flushed at the end of update().
+  private GameObject[] _pendingDestroy;
+
   this(string name) {
     this.name = name;
   }
@@ -38,6 +41,25 @@ class Scene {
     roots = remove!(x => x is go.transform)(roots);
   }
 
+  // Queue an object for safe destruction at the end of the current frame.
+  // Use this instead of destroyObject when destroying from inside update or a
+  // physics callback, where mutating the scene/physics lists immediately would
+  // corrupt in-progress iteration.
+  void requestDestroy(GameObject go) {
+    if (go is null) return;
+    foreach (q; _pendingDestroy)
+      if (q is go) return;            // already queued
+    _pendingDestroy ~= go;
+  }
+
+  private void processDestroyQueue() {
+    if (_pendingDestroy.length == 0) return;
+    auto queued   = _pendingDestroy;  // take a snapshot
+    _pendingDestroy = [];             // so destroys can queue more for next frame
+    foreach (go; queued)
+      destroyObject(go);
+  }
+
   void start() {
     foreach (t; roots)
       t.gameObject.start();
@@ -47,6 +69,7 @@ class Scene {
     physicsWorld.step(dt);
     foreach (t; roots)
       if (t.gameObject.active) t.gameObject.update(dt);
+    processDestroyQueue();            // flush deferred destroys at a safe point
   }
 
   void draw(DrawContext ctx) {

@@ -3,10 +3,12 @@ module engine.scripting.luascript;
 import std.json;
 
 import lua;
+import raylib : Vector3;
 
 import engine.asset;
 import engine.core.component;
 import engine.core.iextraserializable;
+import engine.physics.collider : Collider, ContactManifold, ICollisionListener, ITriggerListener;
 
 import engine.scripting.luaruntime;
 import engine.scripting.luafielddef;
@@ -14,7 +16,7 @@ import engine.scripting.luafieldvalue;
 import engine.scripting.luascriptdef;
 import engine.scripting.luax;
 
-class LuaScript : Component, IExtraSerializable {
+class LuaScript : Component, IExtraSerializable, ICollisionListener, ITriggerListener {
   mixin Named!"LuaScript";
 
   private string _scriptPath;
@@ -31,7 +33,12 @@ class LuaScript : Component, IExtraSerializable {
 
   private LuaScriptDef def;
   private int  instanceRef = LUA_NOREF;
+
+  // Cached "does the script define this method?" flags, so we never pay a Lua
+  // lookup for a callback the script doesn't implement (collisions are hot).
   private bool hasOnUpdate;
+  private bool hasTriggerEnter, hasTriggerStay, hasTriggerExit;
+  private bool hasCollisionEnter, hasCollisionStay, hasCollisionExit;
 
   int fieldIndex(string name) {
     if (!def) return -1;
@@ -70,6 +77,54 @@ class LuaScript : Component, IExtraSerializable {
     // methodName comes from lua_tolstring, which Lua null-terminates, so .ptr
     // is a valid C string without copying.
     callMethod(L, methodName.ptr, nargs);
+  }
+
+  // --- Physics callbacks (ITriggerListener / ICollisionListener) ---
+  // The physics world scans owner.components for these interfaces and calls them.
+  // We forward to the matching Lua method, passing the other object's handle
+  // (triggers) or a contact table (collisions). The has* guards keep this free
+  // for scripts that don't define the callback.
+  void onTriggerEnter(Collider other) { if (hasTriggerEnter) fireTrigger("onTriggerEnter", other); }
+  void onTriggerStay (Collider other) { if (hasTriggerStay)  fireTrigger("onTriggerStay",  other); }
+  void onTriggerExit (Collider other) { if (hasTriggerExit)  fireTrigger("onTriggerExit",  other); }
+
+  void onCollisionEnter(ref ContactManifold m) { if (hasCollisionEnter) fireCollision("onCollisionEnter", m); }
+  void onCollisionStay (ref ContactManifold m) { if (hasCollisionStay)  fireCollision("onCollisionStay",  m); }
+  void onCollisionExit (ref ContactManifold m) { if (hasCollisionExit)  fireCollision("onCollisionExit",  m); }
+
+  private void fireTrigger(const(char)* method, Collider other) {
+    if (instanceRef == LUA_NOREF) return;
+    auto L = get_luaruntime();
+    auto otf = (other && other.owner) ? other.owner.transform : null;
+    pushHandle(L, cast(void*)otf);   // arg: the other object's Transform handle
+    callMethod(L, method, 1);
+    lua_pop(L, 1);                   // callMethod copies args; drop ours
+  }
+
+  private void fireCollision(const(char)* method, ref ContactManifold m) {
+    if (instanceRef == LUA_NOREF) return;
+    auto L = get_luaruntime();
+    pushManifold(L, m);              // arg: { count, point{x,y,z}, normal{x,y,z}, depth }
+    callMethod(L, method, 1);
+    lua_pop(L, 1);
+  }
+
+  private static void pushManifold(lua_State* L, ref ContactManifold m) {
+    lua_newtable(L);                       // [t]
+    push(L, m.count); setField(L, "count");
+    if (m.count > 0) {
+      auto c = m.contacts[0];              // primary contact
+      pushVec3Table(L, c.point);  setField(L, "point");
+      pushVec3Table(L, c.normal); setField(L, "normal");
+      push(L, c.depth);           setField(L, "depth");
+    }
+  }
+
+  private static void pushVec3Table(lua_State* L, Vector3 v) {
+    lua_newtable(L);
+    push(L, v.x); setField(L, "x");
+    push(L, v.y); setField(L, "y");
+    push(L, v.z); setField(L, "z");
   }
 
   // --- Serialization ---
@@ -139,33 +194,53 @@ class LuaScript : Component, IExtraSerializable {
     lua_pushvalue(L, -2);             // [class, instance, class]
     lua_setmetatable(L, -2);          // setmetatable(instance, class)   [class, instance]
 
-    pushHandle(L, cast(void*)owner);  // [class, instance, owner]
-    setField(L, "gameObject");        // instance.gameObject = owner     [class, instance]
+    // The Lua handle is always a Transform (matches getTF and GameObject.find).
+    // owner is the GameObject, so push its transform.
+    pushHandle(L, cast(void*)owner.transform); // [class, instance, transform]
+    setField(L, "gameObject");                 // instance.gameObject = transform  [class, instance]
 
     instanceRef = storeRef(L);        // keep instance alive             [class]
     lua_pop(L, 1);                    // pop class                       []
 
     syncFieldValues(L);
 
-    // Cache whether onUpdate exists (checked every frame).
+    // Cache which callbacks the script defines (avoids per-call Lua lookups).
+    hasOnUpdate       = methodExists(L, "onUpdate");
+    hasTriggerEnter   = methodExists(L, "onTriggerEnter");
+    hasTriggerStay    = methodExists(L, "onTriggerStay");
+    hasTriggerExit    = methodExists(L, "onTriggerExit");
+    hasCollisionEnter = methodExists(L, "onCollisionEnter");
+    hasCollisionStay  = methodExists(L, "onCollisionStay");
+    hasCollisionExit  = methodExists(L, "onCollisionExit");
+  }
+
+  // True if the script's class table defines `name` as a function.
+  private bool methodExists(lua_State* L, const(char)* name) {
     def.pushClass(L);
-    getField(L, "onUpdate");
-    hasOnUpdate = isFunction(L);
+    getField(L, name);
+    bool ok = isFunction(L);
     lua_pop(L, 2);
+    return ok;
+  }
+
+  private void resetCallbackFlags() {
+    hasOnUpdate = false;
+    hasTriggerEnter = hasTriggerStay = hasTriggerExit = false;
+    hasCollisionEnter = hasCollisionStay = hasCollisionExit = false;
   }
 
   private void unloadScript() {
     if (instanceRef == LUA_NOREF) return;
     freeRef(get_luaruntime(), instanceRef);
     instanceRef = LUA_NOREF;
-    hasOnUpdate = false;
+    resetCallbackFlags();
   }
 
   private void reload() {
     if (_scriptPath.length) invalidateScriptDef(get_luaruntime(), _scriptPath);
     def         = null;
     fieldValues = null;
-    hasOnUpdate = false;
+    resetCallbackFlags();
     if (instanceRef != LUA_NOREF) unloadScript();
     if (_scriptPath.length) loadScript();
   }
@@ -207,11 +282,11 @@ class LuaScript : Component, IExtraSerializable {
 
   private static void pushValue(lua_State* L, ref LuaFieldValue v) {
     final switch (v.type) {
-    case LuaFieldType.Float:   push(L, v.f); break;
-    case LuaFieldType.Int:     push(L, v.i); break;
-    case LuaFieldType.Bool:    push(L, v.b); break;
-    case LuaFieldType.String_: push(L, v.s); break;
-    case LuaFieldType.Object_: pushResolvedObject(L, v.s); break;
+      case LuaFieldType.Float:   push(L, v.f); break;
+      case LuaFieldType.Int:     push(L, v.i); break;
+      case LuaFieldType.Bool:    push(L, v.b); break;
+      case LuaFieldType.String_: push(L, v.s); break;
+      case LuaFieldType.Object_: pushResolvedObject(L, v.s); break;
     }
   }
 

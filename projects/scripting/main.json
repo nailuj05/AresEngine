@@ -1,0 +1,184 @@
+{
+    "name": "main",
+    "roots": [
+        {
+            "active": true,
+            "children": [
+                {
+                    "active": true,
+                    "children": [],
+                    "components": [],
+                    "name": "Spawn",
+                    "position": {
+                        "x": 0.87125551700592041,
+                        "y": 2.12614536285400391,
+                        "z": -0.0182892084121704102
+                    },
+                    "rotation": {
+                        "w": 0.745355069637298584,
+                        "x": 0.0,
+                        "y": 0.666667759418487549,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 0.999999880790710449,
+                        "y": 1.0,
+                        "z": 0.999999880790710449
+                    }
+                }
+            ],
+            "components": [
+                {
+                    "enabled": true,
+                    "fields": {
+                        "materials": [
+                            "Material.mat",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ],
+                        "modelPath": "Mars.glb"
+                    },
+                    "type": "ModelRenderer"
+                },
+                {
+                    "enabled": true,
+                    "fields": {
+                        "enemyPrefab": "scene:\/\/Prefab",
+                        "hitDamage": 10.0,
+                        "scriptPath": "test.lua",
+                        "spawnPoint": "scene:\/\/Mars\/Spawn",
+                        "target": "scene:\/\/Target"
+                    },
+                    "type": "LuaScript"
+                }
+            ],
+            "name": "Mars",
+            "position": {
+                "x": -0.114979743957519531,
+                "y": 0.0,
+                "z": -2.7384493350982666
+            },
+            "rotation": {
+                "w": 0.745355188846588135,
+                "x": 0.0,
+                "y": -0.666667699813842773,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            }
+        },
+        {
+            "active": true,
+            "children": [],
+            "components": [
+                {
+                    "enabled": true,
+                    "fields": {
+                        "farPlane": 1000.0,
+                        "fieldOfView": 80.0,
+                        "nearPlane": 0.100000001490116119,
+                        "projection": 0
+                    },
+                    "type": "Camera"
+                }
+            ],
+            "name": "Camera",
+            "position": {
+                "x": 6.85544586181640625,
+                "y": 2.96934342384338379,
+                "z": 0.0
+            },
+            "rotation": {
+                "w": -0.679981410503387451,
+                "x": -0.0574417933821678162,
+                "y": 0.729009747505187988,
+                "z": -0.053578641265630722
+            },
+            "scale": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            }
+        },
+        {
+            "active": true,
+            "children": [],
+            "components": [
+                {
+                    "enabled": true,
+                    "fields": {
+                        "materials": [
+                            ""
+                        ],
+                        "modelPath": "primitive:\/\/sphere"
+                    },
+                    "type": "ModelRenderer"
+                },
+                {
+                    "enabled": true,
+                    "fields": {
+                        "hp": 100.0,
+                        "scriptPath": "target.lua"
+                    },
+                    "type": "LuaScript"
+                }
+            ],
+            "name": "Target",
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 2.58303451538085938
+            },
+            "rotation": {
+                "w": 1.0,
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            }
+        },
+        {
+            "active": true,
+            "children": [],
+            "components": [
+                {
+                    "enabled": true,
+                    "fields": {
+                        "materials": [
+                            "Material.mat"
+                        ],
+                        "modelPath": "primitive:\/\/cube"
+                    },
+                    "type": "ModelRenderer"
+                }
+            ],
+            "name": "Prefab",
+            "position": {
+                "x": -3.14241790771484375,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "w": 1.0,
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            }
+        }
+    ]
+}

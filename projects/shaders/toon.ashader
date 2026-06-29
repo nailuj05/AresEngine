@@ -1,0 +1,48 @@
+#version 330 core
+
+@uniform(engine) mat4 mvp;
+@uniform(engine) mat4 matModel;
+@uniform(engine) mat4 matNormal;
+@uniform(engine) vec3 viewPos;
+
+@uniform(material, label="Base Color")                       vec4  baseColor;
+@uniform(material, label="Rim Color")                        vec4  rimColor;
+@uniform(material, label="Rim Strength", min=0.0, max=5.0)   float rimStrength;
+@uniform(material, label="Shade Steps",  min=1.0, max=8.0)   float steps;
+@uniform(material, label="Ambient",      min=0.0, max=1.0)   float ambient;
+
+@varying vec3 fragPos;
+@varying vec3 fragNormal;
+
+@vertex
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 2) in vec3 vertexNormal;
+
+void main() {
+  fragPos     = vec3(matModel * vec4(vertexPosition, 1.0));
+  fragNormal  = normalize(mat3(matNormal) * vertexNormal);
+  gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+
+@fragment
+out vec4 finalColor;
+
+void main() {
+  vec3 normal   = normalize(fragNormal);
+  vec3 lightDir = normalize(vec3(1.0, 1.0, 0.5));
+  vec3 viewDir  = normalize(viewPos - fragPos);
+
+  // quantized diffuse
+  float diff    = max(dot(normal, lightDir), 0.0);
+  float stepped = floor(diff * steps) / steps;
+
+  // rim
+  float rim     = 1.0 - max(dot(viewDir, normal), 0.0);
+  rim           = pow(rim, 3.0);
+  float rimTerm = step(0.4, rim) * rimStrength;
+
+  vec3 color = baseColor.rgb * (ambient + stepped);
+  color      = mix(color, rimColor.rgb, clamp(rimTerm, 0.0, 1.0));
+
+  finalColor = vec4(color, baseColor.a);
+}

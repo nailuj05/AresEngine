@@ -1,0 +1,62 @@
+#version 330 core
+
+@uniform(engine) mat4  mvp;
+@uniform(engine) mat4  matModel;
+@uniform(engine) mat4  matNormal;
+@uniform(engine) vec3  viewPos;
+@uniform(engine) float time;
+
+@uniform(material, label="Shallow Color")                        vec4  shallowColor;
+@uniform(material, label="Deep Color")                           vec4  deepColor;
+@uniform(material, label="Wave Height",  min=0.0, max=1.0)       float waveHeight;
+@uniform(material, label="Wave Speed",   min=0.0, max=5.0)       float waveSpeed;
+@uniform(material, label="Wave Scale",   min=0.1, max=10.0)      float waveScale;
+@uniform(material, label="Fresnel Power",min=0.5, max=5.0)       float fresnelPower;
+
+@varying vec3 fragPos;
+@varying vec3 fragNormal;
+@varying float waveStrength;
+
+@vertex
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 2) in vec3 vertexNormal;
+
+void main() {
+  vec3 pos = vertexPosition;
+
+  // two overlapping sine waves for a natural look
+  float t  = time * waveSpeed;
+  float w1 = sin(pos.x * waveScale       + t) * cos(pos.z * waveScale * 0.8 + t * 0.9);
+  float w2 = sin(pos.x * waveScale * 1.5 + t * 1.2) * sin(pos.z * waveScale + t * 0.7);
+  float disp = (w1 + w2) * 0.5 * waveHeight;
+
+  pos.y += disp;
+  float safeHeight = max(waveHeight, 0.001);
+  waveStrength = (disp / safeHeight) * 0.5 + 0.5;
+
+  fragPos    = vec3(matModel * vec4(pos, 1.0));
+  fragNormal = normalize(mat3(matNormal) * vertexNormal);
+  gl_Position = mvp * vec4(pos, 1.0);
+}
+
+@fragment
+out vec4 finalColor;
+
+void main() {
+  vec3 normal  = normalize(fragNormal);
+  vec3 viewDir = normalize(viewPos - fragPos);
+
+  // fresnel: more deep color at glancing angles
+  float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), fresnelPower);
+  vec3  color   = mix(shallowColor.rgb, deepColor.rgb, fresnel);
+
+  // brighten crests
+  color += vec3(waveStrength * 0.15);
+
+  // simple top-down light
+  vec3  lightDir = normalize(vec3(0.3, 1.0, 0.2));
+  float spec     = pow(max(dot(reflect(-lightDir, normal), viewDir), 0.0), 32.0);
+  color         += vec3(spec * 0.4);
+
+  finalColor = vec4(color, shallowColor.a);
+}

@@ -1,4 +1,4 @@
 *~
 build/
-*.json
 *.blend1
+.ares

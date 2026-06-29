@@ -1,0 +1,11 @@
+{
+    "fullscreen": false,
+    "name": "New Project",
+    "resX": 600,
+    "resY": 400,
+    "scenes": {
+        "main": "main.json"
+    },
+    "targetFPS": 60,
+    "version": "0.0.2"
+}
